@@ -1,0 +1,10 @@
+{
+  "name": "potabilizadora-p12",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Simulación y monitoreo en vivo de la potabilizadora de agua lluvia P12",
+  "engines": {
+    "node": ">=18"
+  }
+}

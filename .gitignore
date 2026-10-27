@@ -1,0 +1,21 @@
+# Herramientas de agentes / configuración local (no forman parte del proyecto)
+.agents/
+.claude/
+.atl/
+skills-lock.json
+
+# Material de referencia y capturas
+Info/
+
+# Node / Vercel
+node_modules/
+.vercel/
+.env
+.env.*
+!.env.example
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

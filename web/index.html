@@ -1,0 +1,1316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Potabilizadora P12</title>
+<meta name="description" content="Simulación 3D del prototipo de potabilizadora de agua lluvia y monitoreo en vivo del equipo real.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+:root{
+  --wall:#E4E6E1; --surface:#F6F7F3; --ink:#1E2A2D; --muted:#5B6869; --line:#C6CCC7;
+  --t1:#2FA57F; --t2:#C93A80; --accent:#2652B8; --clean:#4B9FD8;
+  --ok:#1F8A4C; --bad:#C2362C; --warn:#A86C12; --off:#77827F;
+  --stage-wall:#CFD3CE; --stage-counter:#E9ECE8; --stage-floor:#9BA3A0; --stage-wood:#BFC3BE;
+  --noise:.10;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --wall:#161D1F; --surface:#1F282B; --ink:#E3E9E7; --muted:#97A5A4; --line:#34413F;
+    --t1:#48C79E; --t2:#E3609F; --accent:#7C9DF2; --clean:#63B4EA;
+    --ok:#47B874; --bad:#E5655B; --warn:#D9A040; --off:#7D8A88;
+    --stage-wall:#3B4446; --stage-counter:#59625F; --stage-floor:#2A3133; --stage-wood:#6E7572;
+    --noise:.18;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --wall:#161D1F; --surface:#1F282B; --ink:#E3E9E7; --muted:#97A5A4; --line:#34413F;
+  --t1:#48C79E; --t2:#E3609F; --accent:#7C9DF2; --clean:#63B4EA;
+  --ok:#47B874; --bad:#E5655B; --warn:#D9A040; --off:#7D8A88;
+  --stage-wall:#3B4446; --stage-counter:#59625F; --stage-floor:#2A3133; --stage-wood:#6E7572;
+  --noise:.18;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background-color:var(--wall); color:var(--ink);
+  font-family:"Archivo",system-ui,"Segoe UI",Roboto,sans-serif; font-size:16px; line-height:1.45;
+  font-variation-settings:"wdth" 100;
+}
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:-1; opacity:var(--noise);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- Header ---------- */
+.top{
+  max-width:1320px; margin:0 auto; padding:20px 16px 8px;
+  display:flex; flex-wrap:wrap; gap:12px 24px; align-items:flex-end; justify-content:space-between;
+}
+.brand h1{
+  margin:0; font-size:clamp(1.6rem,3.4vw,2.4rem); line-height:1.05; letter-spacing:-.01em;
+  font-weight:780; font-variation-settings:"wdth" 118;
+}
+.brand p{margin:6px 0 0;color:var(--muted);max-width:60ch}
+.source{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.status{font-size:.9rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--off);flex:none}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:2px}
+.seg button{border:0;background:transparent;padding:7px 14px;border-radius:6px;cursor:pointer;font-weight:560}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.seg.small button{padding:5px 10px;font-size:.9rem}
+
+/* ---------- Layout ---------- */
+.layout{
+  max-width:1320px; margin:0 auto; padding:8px 16px 40px;
+  display:grid; gap:20px;
+  grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);
+  grid-template-areas:"scene sensors" "chart controls" "chart log";
+  align-items:start;
+}
+.scene{grid-area:scene;margin:0}
+.sensors{grid-area:sensors}
+.controls{grid-area:controls}
+.chart{grid-area:chart}
+.log{grid-area:log}
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"scene" "sensors" "controls" "chart" "log"}
+}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px}
+.panel h2{margin:0;font-size:1.05rem;font-weight:700;font-variation-settings:"wdth" 108}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
+.hint{color:var(--muted);font-size:.85rem;margin:0}
+
+/* ---------- Escena 3D ---------- */
+.stage{
+  position:relative; width:100%; aspect-ratio:4/3.2; min-height:360px;
+  border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--stage-wall);
+  touch-action:none;
+}
+@media (max-width:600px){ .stage{aspect-ratio:4/5} }
+.stage canvas{display:block;position:absolute;inset:0;width:100%;height:100%;cursor:grab}
+.stage canvas:active{cursor:grabbing}
+.labels{position:absolute;inset:0;pointer-events:none}
+.stage.no-labels .labels{display:none}
+.stage-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
+.stage.compact .lbl{font-size:11px;padding:2px 5px}
+.stage.compact .lbl span{display:none}
+.stage.compact .lbl.big b{font-size:15px}
+.stage.compact .lbl.minor{display:none}
+.stage-clock{position:absolute;top:10px;right:12px;margin:0;font-size:.85rem;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;z-index:2;
+  background:color-mix(in srgb,var(--surface) 80%,transparent);padding:2px 8px;border-radius:4px}
+.stage-clock:empty{display:none}
+.stage-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--muted);z-index:1}
+.stage-msg[hidden]{display:none}
+.btn.chip-btn{padding:5px 10px;font-size:.9rem;background:var(--surface)}
+.btn.chip-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.scene figcaption{color:var(--muted);font-size:.85rem;margin-top:6px}
+
+.lbl{
+  font-size:12.5px; line-height:1.2; white-space:nowrap; color:var(--ink);
+  background:color-mix(in srgb,var(--surface) 88%,transparent); border:1px solid var(--line);
+  border-radius:4px; padding:3px 7px; font-variation-settings:"wdth" 88; font-variant-numeric:tabular-nums;
+  box-shadow:0 1px 2px rgb(0 0 0 / .12);
+}
+.lbl b{font-weight:680;display:block}
+.lbl span{color:var(--muted);font-size:11.5px}
+.lbl span:empty{display:none}
+.lbl.big b{font-size:20px;font-variation-settings:"wdth" 72;font-weight:760}
+.lbl.t1{border-left:4px solid var(--t1)} .lbl.t2{border-left:4px solid var(--t2)}
+.lbl.on{border-color:var(--ok)} .lbl.bad{border-color:var(--bad);color:var(--bad)}
+.lbl.mark{background:transparent;border:0;box-shadow:none;padding:0;font-size:11px;color:var(--ink);font-weight:650}
+
+/* ---------- Sensores ---------- */
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:11px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0;padding-top:4px}
+.r-name{font-weight:640;display:flex;gap:8px;align-items:center;min-width:0}
+.r-name small{display:block;font-weight:450;color:var(--muted);font-size:.82rem}
+.sw{width:10px;height:22px;border-radius:2px;flex:none;background:var(--off)}
+.sw.t1{background:var(--t1)} .sw.t2{background:var(--t2)} .sw.ph{background:var(--accent)}
+.r-val{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.r-val b{font-size:2rem;line-height:1;font-weight:760;font-variation-settings:"wdth" 70}
+.r-val .u{font-size:.95rem;font-weight:600;margin-left:2px;color:var(--muted)}
+.r-sub{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
+.chip{justify-self:end;font-size:.78rem;font-weight:650;padding:2px 9px;border-radius:99px;color:#fff;background:var(--off);white-space:nowrap}
+.chip.ok{background:var(--ok)} .chip.bad{background:var(--bad)} .chip.warn{background:var(--warn)}
+.valve-state{font-size:1.15rem;font-weight:740;font-variation-settings:"wdth" 80}
+.valve-state.open{color:var(--ok)}
+.stale .rows{opacity:.55}
+
+/* ---------- Controles ---------- */
+.controls fieldset{border:0;margin:0;padding:12px 0;border-top:1px solid var(--line)}
+.controls fieldset:first-of-type{border-top:0;padding-top:0}
+.controls legend{font-weight:680;padding:0;margin-bottom:8px}
+.ctl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;margin:8px 0}
+.ctl label{font-size:.92rem}
+.ctl output{font-variant-numeric:tabular-nums;font-weight:640;font-size:.92rem}
+.ctl input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--wall);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:560}
+.btn:hover{border-color:var(--ink)}
+.vrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0}
+.thr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.thr label{display:flex;flex-direction:column;font-size:.85rem;color:var(--muted);gap:3px}
+.thr input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--wall);font-variant-numeric:tabular-nums}
+.chk{display:flex;gap:8px;align-items:center;margin:6px 0;font-size:.92rem}
+.chk input{accent-color:var(--bad);width:16px;height:16px}
+.realnote{display:none}
+.is-real .simonly{display:none}
+.is-real .realnote{display:block}
+.is-real .row.realnote{display:grid}
+
+/* ---------- Gráfica y registro ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.85rem;color:var(--muted)}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
+.chart canvas{display:block;width:100%;height:260px}
+.log ol{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto;font-size:.9rem}
+.log li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.log li:first-child{border-top:0}
+.log time{color:var(--muted);font-variant-numeric:tabular-nums}
+.log .k-bad{color:var(--bad);font-weight:600}
+.log .k-ok{color:var(--ok);font-weight:600}
+.empty{color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Potabilizadora P12</h1>
+    <p>Agua de lluvia del techo, dos filtros y un control de pH antes de entregarla. Simula el prototipo en 3D o mira el equipo real en vivo.</p>
+  </div>
+  <div class="source">
+    <div class="seg" role="group" aria-label="Fuente de datos">
+      <button type="button" id="src-sim" aria-pressed="true">Simulación</button>
+      <button type="button" id="src-real" aria-pressed="false">ESP32 real</button>
+    </div>
+    <div class="status" aria-live="polite"><span class="dot" id="st-dot"></span><span id="st-txt">Iniciando…</span></div>
+  </div>
+</header>
+
+<main class="layout" id="app">
+  <!-- ===================== Escena 3D ===================== -->
+  <figure class="scene">
+    <div class="stage" id="stage" role="img" aria-label="Modelo 3D del prototipo: techo, tanque 1, electroválvula 1, filtro de sedimentos, filtro de carbón activado, tanque 2, electrodo de pH y electroválvula 2">
+      <p class="stage-msg" id="stage-msg">Cargando el modelo 3D…</p>
+      <p class="stage-clock" id="clock"></p>
+    </div>
+    <div class="stage-tools">
+      <div class="seg small" role="group" aria-label="Vista de cámara" id="views">
+        <button type="button" data-v="general" aria-pressed="true">General</button>
+        <button type="button" data-v="t1" aria-pressed="false">Tanque 1</button>
+        <button type="button" data-v="filtros" aria-pressed="false">Filtros</button>
+        <button type="button" data-v="t2" aria-pressed="false">Tanque 2</button>
+      </div>
+      <button type="button" class="btn chip-btn" id="b-labels" aria-pressed="true">Etiquetas</button>
+    </div>
+    <figcaption id="cap">Arrastra para girar y usa la rueda o dos dedos para acercar. Las tuberías se ven por dentro para seguir el agua.</figcaption>
+  </figure>
+
+  <!-- ===================== Sensores ===================== -->
+  <section class="panel sensors" aria-labelledby="h-sens" id="sensors">
+    <div class="panel-head"><h2 id="h-sens">Sensores en vivo</h2><p class="hint" id="fresh"></p></div>
+    <div class="rows">
+      <div class="row">
+        <div class="r-name"><span class="sw t1"></span><span>Ultrasónico US1<small>Tanque 1 · agua de lluvia</small></span></div>
+        <div class="r-val"><b id="v-n1">--</b><span class="u">%</span></div>
+        <div class="r-sub" id="v-d1">sin lectura</div>
+        <span class="chip" id="c-us1">--</span>
+      </div>
+      <div class="row">
+        <div class="r-name"><span class="sw t2"></span><span>Ultrasónico US2<small>Tanque 2 · agua filtrada</small></span></div>
+        <div class="r-val"><b id="v-n2">--</b><span class="u">%</span></div>
+        <div class="r-sub" id="v-d2">sin lectura</div>
+        <span class="chip" id="c-us2">--</span>
+      </div>
+      <div class="row">
+        <div class="r-name"><span class="sw ph"></span><span>Sensor de pH<small>Electrodo en el tanque 2</small></span></div>
+        <div class="r-val"><b id="v-ph">--</b></div>
+        <div class="r-sub" id="v-phv">--</div>
+        <span class="chip" id="c-ph">--</span>
+      </div>
+      <div class="row">
+        <div class="r-name"><span class="sw"></span><span>Electroválvula EV1<small>Tanque 1 → filtros → tanque 2</small></span></div>
+        <div class="r-val"><span class="valve-state" id="v-ev1s">--</span></div>
+        <div class="r-sub" id="v-m1"></div>
+      </div>
+      <div class="row">
+        <div class="r-name"><span class="sw"></span><span>Electroválvula EV2<small>Salida de agua apta</small></span></div>
+        <div class="r-val"><span class="valve-state" id="v-ev2s">--</span></div>
+        <div class="r-sub" id="v-m2"></div>
+      </div>
+      <div class="row realnote">
+        <div class="r-name"><span class="sw"></span><span>Batería 12 V<small>Alimentación de las válvulas</small></span></div>
+        <div class="r-val"><b id="v-bat">--</b><span class="u">V</span></div>
+        <div class="r-sub"></div>
+        <span class="chip" id="c-bat">--</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Controles ===================== -->
+  <section class="panel controls" aria-labelledby="h-ctl">
+    <div class="panel-head"><h2 id="h-ctl">Controles</h2></div>
+    <p class="hint realnote">Estás viendo el equipo real: los controles de simulación no se aplican. La lógica la decide el firmware del ESP32.</p>
+
+    <div class="simonly">
+      <fieldset>
+        <legend>Clima y consumo</legend>
+        <div class="ctl"><label for="in-rain">Intensidad de lluvia</label><output id="o-rain" for="in-rain"></output>
+          <input type="range" id="in-rain" min="0" max="100" step="1" value="40"></div>
+        <div class="ctl"><label for="in-phr">pH del agua de lluvia</label><output id="o-phr" for="in-phr"></output>
+          <input type="range" id="in-phr" min="4" max="10" step="0.1" value="6.4"></div>
+        <div class="ctl"><label for="in-use">Consumo en la salida</label><output id="o-use" for="in-use"></output>
+          <input type="range" id="in-use" min="0" max="1.5" step="0.05" value="0.4"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Tiempo</legend>
+        <div class="btns">
+          <div class="seg small" role="group" aria-label="Velocidad de simulación" id="speed">
+            <button type="button" data-v="1" aria-pressed="false">1×</button>
+            <button type="button" data-v="10" aria-pressed="true">10×</button>
+            <button type="button" data-v="30" aria-pressed="false">30×</button>
+          </div>
+          <button type="button" class="btn" id="b-pause">Pausar</button>
+          <button type="button" class="btn" id="b-reset">Reiniciar</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Modo de operación</legend>
+        <div class="seg small" role="group" aria-label="Modo" id="mode">
+          <button type="button" data-v="auto" aria-pressed="true">Automático</button>
+          <button type="button" data-v="manual" aria-pressed="false">Manual</button>
+        </div>
+        <div class="vrow"><span>EV1</span><span class="btns"><button type="button" class="btn" data-ev="1" data-on="1">Abrir</button><button type="button" class="btn" data-ev="1" data-on="0">Cerrar</button></span></div>
+        <div class="vrow"><span>EV2</span><span class="btns"><button type="button" class="btn" data-ev="2" data-on="1">Abrir</button><button type="button" class="btn" data-ev="2" data-on="0">Cerrar</button></span></div>
+        <p class="hint">Abrir o cerrar una válvula pasa a modo manual.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Umbrales de control</legend>
+        <div class="thr">
+          <label>EV1 abre con tanque 1 al (%)<input type="number" id="u-ev1" min="10" max="100" value="80"></label>
+          <label>EV2 abre con tanque 2 al (%)<input type="number" id="u-ev2" min="10" max="100" value="80"></label>
+          <label>Cierran al bajar a (%)<input type="number" id="u-cerrar" min="0" max="90" value="20"></label>
+          <label>Tanque 2 lleno (%)<input type="number" id="u-lleno" min="50" max="100" value="95"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Probar fallas</legend>
+        <label class="chk"><input type="checkbox" id="f-us1">US1 sin eco (sensor desconectado)</label>
+        <label class="chk"><input type="checkbox" id="f-us2">US2 sin eco (sensor desconectado)</label>
+        <label class="chk"><input type="checkbox" id="f-clog">Filtro 1 saturado</label>
+        <div class="btns" style="margin-top:8px">
+          <button type="button" class="btn" data-phr="4.6">Lluvia ácida</button>
+          <button type="button" class="btn" data-phr="9.6">Agua alcalina</button>
+          <button type="button" class="btn" data-phr="6.4">Lluvia normal</button>
+        </div>
+      </fieldset>
+    </div>
+  </section>
+
+  <!-- ===================== Gráfica ===================== -->
+  <section class="panel chart" aria-labelledby="h-chart">
+    <div class="panel-head">
+      <h2 id="h-chart">Últimos 10 minutos</h2>
+      <div class="legend"><span><i style="background:var(--t1)"></i>Tanque 1</span><span><i style="background:var(--t2)"></i>Tanque 2</span><span><i style="background:var(--accent)"></i>pH</span></div>
+    </div>
+    <canvas id="cv" role="img" aria-label="Gráfica de nivel de los tanques y pH en los últimos 10 minutos"></canvas>
+    <p class="hint" style="margin-top:6px">Eje izquierdo: nivel en %. Eje derecho: pH de 0 a 14. La franja marca el pH apto (6,5–8,5).</p>
+  </section>
+
+  <!-- ===================== Registro ===================== -->
+  <section class="panel log" aria-labelledby="h-log">
+    <div class="panel-head"><h2 id="h-log">Registro de eventos</h2></div>
+    <ol id="log" aria-live="polite"></ol>
+    <p class="empty" id="log-empty">Todavía no hay eventos.</p>
+  </section>
+</main>
+
+<script type="module">
+'use strict';
+const $ = id => document.getElementById(id);
+
+// ---------------------------------------------------------------------------
+// Configuración (mismos valores que Potabilizadora.ino)
+// ---------------------------------------------------------------------------
+const CFG = {
+  distVacio: 100, distLleno: 20, cap: 200,
+  phMin: 6.5, phMax: 8.5, phHist: 0.1, phV7: 2.50, phPend: 0.18,
+  minEntre: 5,          // s entre aperturas de una misma válvula
+  techoM2: 40,          // área de captación del techo
+  ev1Max: 1.2,          // L/s por gravedad con el tanque 1 lleno
+  phSeco: 10,           // % de tanque 2 bajo el cual el electrodo queda fuera del agua
+};
+const UMB = { ev1: 80, ev2: 80, cerrar: 20, lleno: 95 };
+const ctl = { lluvia: 40, phLluvia: 6.4, consumo: 0.4, vel: 10, pausa: false, falla1: false, falla2: false, saturado: false };
+
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+const fmt = (v, d) => (v == null || Number.isNaN(v)) ? '--' : v.toFixed(d).replace('.', ',');
+const reducirMovimiento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------------------------------------------------------------------------
+// Simulación
+// ---------------------------------------------------------------------------
+let sim;
+function nuevoSensor() { return { m: [], fallas: 0, listo: false, falla: false, d: null, n: null, l: null }; }
+function nuevaValvula() { return { abierta: false, ultimo: -1e9, motivo: 'Iniciando sensores', motivoCambio: '', pedido: false }; }
+function nuevaSim() {
+  return {
+    t: 0, l1: 35, l2: 0, ph1: ctl.phLluvia, ph2: 7.0, entregado: 0, rebosa: false,
+    us: [nuevoSensor(), nuevoSensor()], turno: 0,
+    phVolt: null, phVal: null, phValido: false, phOk: false, phSeco: true, phTimer: 0,
+    ctrlTimer: 0, listo: false, manual: false,
+    ev1: nuevaValvula(), ev2: nuevaValvula(),
+    flujo: { lluvia: 0, ev1: 0, ev2: 0 },
+  };
+}
+
+function leerUltrasonico(k) {
+  const u = sim.us[k];
+  const litros = k ? sim.l2 : sim.l1;
+  const falla = k ? ctl.falla2 : ctl.falla1;
+  let d = NaN;
+  if (!falla) {
+    const real = CFG.distVacio - (litros / CFG.cap) * (CFG.distVacio - CFG.distLleno);
+    d = real + gauss() * 0.25;
+  }
+  u.m.push(d); if (u.m.length > 5) u.m.shift();
+  u.fallas = Number.isNaN(d) ? Math.min(255, u.fallas + 1) : 0;
+  u.falla = u.fallas >= 5;
+  const v = u.m.filter(x => !Number.isNaN(x)).sort((a, b) => a - b);
+  if (v.length < 3) return;                       // se conserva el último valor
+  u.d = v[Math.floor(v.length / 2)];
+  u.n = clamp((CFG.distVacio - u.d) * 100 / (CFG.distVacio - CFG.distLleno), 0, 100);
+  u.l = CFG.cap * u.n / 100;
+  u.listo = true;
+}
+
+function leerPh() {
+  const s = sim;
+  s.phSeco = (s.l2 / CFG.cap * 100) < CFG.phSeco;
+  if (s.phSeco) { s.phVolt = null; s.phVal = null; s.phValido = false; s.phOk = false; return; }
+  const v = CFG.phV7 - (s.ph2 - 7) * CFG.phPend + gauss() * 0.004;
+  s.phVolt = s.phVolt == null ? v : s.phVolt * 0.8 + v * 0.2;
+  const ph = 7 + (CFG.phV7 - s.phVolt) / CFG.phPend;
+  s.phVal = ph;
+  s.phValido = ph >= 0 && ph <= 14;
+  if (!s.phValido) { s.phOk = false; return; }
+  if (s.phOk) { if (ph < CFG.phMin - CFG.phHist || ph > CFG.phMax + CFG.phHist) s.phOk = false; }
+  else if (ph >= CFG.phMin && ph <= CFG.phMax) s.phOk = true;
+}
+
+function ponerValvula(v, abrir, motivo, forzar) {
+  v.motivo = motivo;
+  if (v.abierta === abrir) return;
+  if (abrir && !forzar && sim.t - v.ultimo < CFG.minEntre) return;
+  v.abierta = abrir;
+  v.ultimo = sim.t;
+  v.motivoCambio = motivo;   // el registro muestra por qué cambió, no el motivo de espera posterior
+}
+
+const sensorMal = u => u.falla || !u.listo;
+
+function controlar() {
+  const s = sim, ev1 = s.ev1, ev2 = s.ev2, [u1, u2] = s.us;
+  if (!s.listo) { ponerValvula(ev1, false, 'Iniciando sensores', true); ponerValvula(ev2, false, 'Iniciando sensores', true); return; }
+  if (s.manual) { ponerValvula(ev1, ev1.pedido, 'Modo manual', true); ponerValvula(ev2, ev2.pedido, 'Modo manual', true); return; }
+
+  // EV1: tanque 1 -> filtros -> tanque 2
+  if (sensorMal(u1)) ponerValvula(ev1, false, 'Falla sensor tanque 1', true);
+  else if (sensorMal(u2)) ponerValvula(ev1, false, 'Falla sensor tanque 2', true);
+  else if (ev1.abierta) {
+    if (u1.n <= UMB.cerrar) ponerValvula(ev1, false, 'Tanque 1 sin agua', true);
+    else if (u2.n >= UMB.lleno) ponerValvula(ev1, false, 'Tanque 2 lleno', true);
+    else ponerValvula(ev1, true, 'Transfiriendo agua', false);
+  } else {
+    if (u1.n < UMB.ev1) ponerValvula(ev1, false, `Esperando ${UMB.ev1} % en tanque 1`, false);
+    else if (u2.n > UMB.lleno - 5) ponerValvula(ev1, false, 'Tanque 2 lleno', false);
+    else ponerValvula(ev1, true, 'Transfiriendo agua', false);
+  }
+
+  // EV2: salida del tanque 2
+  if (sensorMal(u2)) ponerValvula(ev2, false, 'Falla sensor tanque 2', true);
+  else if (!s.phValido) ponerValvula(ev2, false, 'Sensor de pH sin lectura', true);
+  else if (!s.phOk) ponerValvula(ev2, false, 'pH fuera de rango', true);
+  else if (ev2.abierta) {
+    if (u2.n <= UMB.cerrar) ponerValvula(ev2, false, 'Tanque 2 casi vacío', true);
+    else ponerValvula(ev2, true, 'Entregando agua', false);
+  } else {
+    if (u2.n < UMB.ev2) ponerValvula(ev2, false, `Esperando ${UMB.ev2} % en tanque 2`, false);
+    else ponerValvula(ev2, true, 'Entregando agua', false);
+  }
+}
+
+function paso(dt) {
+  const s = sim;
+  s.t += dt;
+
+  // Lluvia: mm/h sobre el techo -> L/s
+  const lluviaLs = ctl.lluvia * CFG.techoM2 / 3600;
+  const ent = Math.min(lluviaLs * dt, CFG.cap - s.l1);
+  if (ent > 0) { s.ph1 = (s.ph1 * s.l1 + ctl.phLluvia * ent) / (s.l1 + ent); s.l1 += ent; }
+  s.rebosa = lluviaLs > 0 && s.l1 >= CFG.cap - 0.05;
+
+  // EV1: por gravedad a través de los dos filtros
+  let q1 = 0;
+  if (s.ev1.abierta && s.l1 > 0) {
+    const paso1 = ctl.saturado ? 0.15 : 1;
+    q1 = Math.min(s.l1, CFG.ev1Max * paso1 * Math.sqrt(Math.max(0.04, s.l1 / CFG.cap)) * dt);
+    const phSalida = s.ph1 + (7.2 - s.ph1) * 0.35;   // el carbón acerca el pH a neutro
+    s.l1 -= q1;
+    const add = Math.min(q1, CFG.cap - s.l2);
+    if (add > 0) { s.ph2 = (s.ph2 * s.l2 + phSalida * add) / (s.l2 + add); s.l2 += add; }
+  }
+
+  // EV2: salida de agua apta
+  let q2 = 0;
+  if (s.ev2.abierta && s.l2 > 0) { q2 = Math.min(s.l2, ctl.consumo * dt); s.l2 -= q2; s.entregado += q2; }
+
+  s.flujo = { lluvia: lluviaLs, ev1: q1 / dt, ev2: q2 / dt };
+
+  leerUltrasonico(s.turno); s.turno ^= 1;
+  s.phTimer += dt; if (s.phTimer >= 1) { s.phTimer -= 1; leerPh(); }
+
+  if (!s.listo && s.t > 4 && (s.us[0].listo || s.us[0].falla) && (s.us[1].listo || s.us[1].falla)) s.listo = true;
+
+  s.ctrlTimer += dt; if (s.ctrlTimer >= 0.25) { s.ctrlTimer = 0; controlar(); }
+}
+
+function estadoSim() {
+  const s = sim, [u1, u2] = s.us;
+  const tq = u => ({ d: u.listo ? u.d : null, n: u.listo ? u.n : null, l: u.listo ? u.l : null, f: u.falla });
+  return {
+    fuente: 'sim', t1: tq(u1), t2: tq(u2),
+    ph: s.phValido ? s.phVal : null, phv: s.phVolt, phok: s.phOk, phSeco: s.phSeco,
+    ev1: s.ev1.abierta, ev2: s.ev2.abierta, m1: s.ev1.motivo, m2: s.ev2.motivo,
+    mc1: s.ev1.motivoCambio, mc2: s.ev2.motivoCambio,
+    manual: s.manual, listo: s.listo, bat: null, batp: false, batb: false,
+    vis1: s.l1 / CFG.cap * 100, vis2: s.l2 / CFG.cap * 100,
+    flujo: s.flujo, lluvia: ctl.lluvia, saturado: ctl.saturado, rebosa: s.rebosa, entregado: s.entregado,
+    reloj: s.t, edad: 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dispositivo real (relay en Vercel)
+// ---------------------------------------------------------------------------
+const real = { timer: null, ultimo: null, ultimoTs: null, primera: true };
+
+function estadoReal(d, edad) {
+  const tq = t => t || { d: null, n: null, l: null, f: false };
+  const t1 = tq(d.t1), t2 = tq(d.t2);
+  return {
+    fuente: 'real', t1, t2,
+    ph: d.ph ?? null, phv: d.phv ?? null, phok: !!d.phok, phSeco: false,
+    ev1: !!d.ev1, ev2: !!d.ev2, m1: d.m1 || '', m2: d.m2 || '',
+    manual: !!d.manual, listo: !!d.listo, bat: d.bat ?? null, batp: !!d.batp, batb: !!d.batb,
+    vis1: t1.n, vis2: t2.n, flujo: null, lluvia: null, saturado: false, rebosa: false, entregado: null,
+    reloj: d.ts / 1000, edad,
+  };
+}
+
+async function sondear() {
+  if (location.protocol === 'file:') {
+    estadoConexion('bad', 'Abre la página desde su dirección de Vercel para ver el equipo real');
+    return;
+  }
+  try {
+    const r = await fetch('/api/telemetry' + (real.primera ? '?history=1' : ''), { cache: 'no-store' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `El servidor respondió ${r.status}`);
+    if (fuente !== 'real') return;
+    if (real.primera && Array.isArray(j.history)) {
+      grafica.reset();
+      j.history.forEach(h => grafica.push(h.ts / 1000, h.n1, h.n2, h.ph));
+    }
+    real.primera = false;
+    if (!j.latest) { estadoConexion('warn', 'Esperando el primer dato del ESP32'); return; }
+    const e = estadoReal(j.latest, j.ageSec);
+    if (j.latest.ts !== real.ultimoTs) { real.ultimoTs = j.latest.ts; grafica.push(e.reloj, e.t1.n, e.t2.n, e.ph); }
+    real.ultimo = e;
+    pintar(e);
+  } catch (err) {
+    if (fuente !== 'real') return;
+    estadoConexion('bad', 'No se pudo leer /api/telemetry: ' + err.message);
+  }
+}
+
+function estadoConexion(tipo, txt) {
+  $('st-dot').className = 'dot ' + tipo;
+  $('st-txt').textContent = txt;
+}
+
+// ---------------------------------------------------------------------------
+// Panel de sensores
+// ---------------------------------------------------------------------------
+function chip(id, txt, tipo) { const c = $(id); c.textContent = txt; c.className = 'chip ' + tipo; }
+
+function pintarPanel(e) {
+  [[1, e.t1], [2, e.t2]].forEach(([k, t]) => {
+    $('v-n' + k).textContent = t.n == null ? '--' : Math.round(t.n);
+    $('v-d' + k).textContent = t.d == null ? 'sin lectura' : `${fmt(t.d, 1)} cm al agua · ${Math.round(t.l)} L`;
+    if (t.f) chip('c-us' + k, 'Sin eco', 'bad');
+    else if (t.n == null) chip('c-us' + k, 'Iniciando', 'warn');
+    else chip('c-us' + k, 'OK', 'ok');
+  });
+
+  $('v-ph').textContent = e.ph == null ? '--' : fmt(e.ph, 2);
+  $('v-phv').textContent = e.phSeco ? 'Electrodo fuera del agua' : `Po = ${fmt(e.phv, 3)} V · apto ${fmt(CFG.phMin, 1)}–${fmt(CFG.phMax, 1)}`;
+  if (e.ph == null) chip('c-ph', 'Sin lectura', 'warn');
+  else chip('c-ph', e.phok ? 'Apta' : 'Fuera de rango', e.phok ? 'ok' : 'bad');
+
+  [[1, e.ev1, e.m1], [2, e.ev2, e.m2]].forEach(([k, abierta, m]) => {
+    const s = $(`v-ev${k}s`);
+    s.textContent = abierta ? 'Abierta' : 'Cerrada';
+    s.className = 'valve-state' + (abierta ? ' open' : '');
+    $('v-m' + k).textContent = m;
+  });
+
+  $('v-bat').textContent = e.bat == null ? '--' : fmt(e.bat, 2);
+  if (!e.batp) chip('c-bat', 'No detectada', 'warn');
+  else chip('c-bat', e.batb ? 'Baja' : 'Normal', e.batb ? 'bad' : 'ok');
+
+  const vieja = e.fuente === 'real' && e.edad > 20;
+  $('sensors').classList.toggle('stale', vieja);
+  if (e.fuente === 'sim') {
+    $('fresh').textContent = 'Lectura continua';
+    estadoConexion(e.listo ? 'ok' : 'warn', `Simulación · ${e.listo ? 'control activo' : 'iniciando sensores'} · modo ${e.manual ? 'manual' : 'automático'}`);
+  } else if (e.sinDatos) {
+    $('fresh').textContent = 'Sin datos todavía';
+  } else {
+    $('fresh').textContent = `Dato de hace ${edadTxt(e.edad)}`;
+    if (vieja) estadoConexion('bad', `ESP32 desconectado · último dato hace ${edadTxt(e.edad)}`);
+    else estadoConexion('ok', `ESP32 en línea · modo ${e.manual ? 'manual' : 'automático'}${e.listo ? '' : ' · iniciando sensores'}`);
+  }
+}
+
+function edadTxt(s) {
+  s = Math.max(0, Math.round(s));
+  if (s < 60) return s + ' s';
+  if (s < 3600) return Math.floor(s / 60) + ' min';
+  return Math.floor(s / 3600) + ' h';
+}
+function reloj(t) {
+  t = Math.floor(t);
+  const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(s).padStart(2, '0');
+}
+
+// ---------------------------------------------------------------------------
+// Registro de eventos (detecta cambios en el estado, igual para ambas fuentes)
+// ---------------------------------------------------------------------------
+let previo = null;
+function registrar(e) {
+  const p = previo; previo = e;
+  if (!p || p.fuente !== e.fuente || p.sinDatos) return;
+  if (!p.listo && e.listo) evento(e, 'Sensores listos, control activo', 'ok');
+  if (p.ev1 !== e.ev1) evento(e, `EV1 ${e.ev1 ? 'abierta' : 'cerrada'} · ${e.mc1 || e.m1}`, e.ev1 ? 'ok' : '');
+  if (p.ev2 !== e.ev2) evento(e, `EV2 ${e.ev2 ? 'abierta' : 'cerrada'} · ${e.mc2 || e.m2}`, e.ev2 ? 'ok' : '');
+  if (p.t1.f !== e.t1.f) evento(e, e.t1.f ? 'US1 sin eco: falla del sensor del tanque 1' : 'US1 volvió a medir', e.t1.f ? 'bad' : 'ok');
+  if (p.t2.f !== e.t2.f) evento(e, e.t2.f ? 'US2 sin eco: falla del sensor del tanque 2' : 'US2 volvió a medir', e.t2.f ? 'bad' : 'ok');
+  if (p.ph != null && e.ph != null && p.phok !== e.phok) evento(e, e.phok ? `pH apto (${fmt(e.ph, 2)})` : `pH fuera de rango (${fmt(e.ph, 2)})`, e.phok ? 'ok' : 'bad');
+  if (p.manual !== e.manual) evento(e, `Modo ${e.manual ? 'manual' : 'automático'}`, '');
+  if (!p.rebosa && e.rebosa) evento(e, 'Tanque 1 lleno: el agua de lluvia rebosa', 'bad');
+}
+function evento(e, txt, tipo) {
+  const li = document.createElement('li');
+  const t = document.createElement('time');
+  t.textContent = e.fuente === 'sim' ? reloj(e.reloj) : new Date(e.reloj * 1000).toLocaleTimeString('es');
+  const s = document.createElement('span');
+  s.textContent = txt; if (tipo) s.className = 'k-' + tipo;
+  li.append(t, s);
+  const ol = $('log'); ol.prepend(li);
+  while (ol.children.length > 60) ol.lastChild.remove();
+  $('log-empty').hidden = true;
+}
+function limpiarRegistro() { $('log').replaceChildren(); $('log-empty').hidden = false; previo = null; }
+
+// ---------------------------------------------------------------------------
+// Gráfica
+// ---------------------------------------------------------------------------
+const grafica = (() => {
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  const VENTANA = 600;
+  let pts = [];
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function push(t, n1, n2, ph) {
+    pts.push({ t, n1, n2, ph });
+    const lim = t - VENTANA;
+    while (pts.length && pts[0].t < lim) pts.shift();
+  }
+  function reset() { pts = []; }
+  function draw(ahora) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const L = 34, R = 28, T = 8, B = 22, pw = w - L - R, ph = h - T - B;
+    const X = t => L + (1 - (ahora - t) / VENTANA) * pw;
+    const Y = p => T + (1 - p / 100) * ph;
+    const muted = css('--muted'), line = css('--line');
+    ctx.font = '11px Archivo, system-ui, sans-serif';
+
+    ctx.fillStyle = css('--accent'); ctx.globalAlpha = .08;
+    ctx.fillRect(L, Y(CFG.phMax / 14 * 100), pw, Y(CFG.phMin / 14 * 100) - Y(CFG.phMax / 14 * 100));
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.fillStyle = muted;
+    for (let p = 0; p <= 100; p += 25) {
+      ctx.beginPath(); ctx.moveTo(L, Y(p) + .5); ctx.lineTo(L + pw, Y(p) + .5); ctx.stroke();
+      ctx.textAlign = 'right'; ctx.fillText(p + '%', L - 5, Y(p) + 4);
+    }
+    ctx.textAlign = 'left';
+    [0, 7, 14].forEach(v => ctx.fillText(String(v), L + pw + 5, Y(v / 14 * 100) + 4));
+    ctx.textAlign = 'center';
+    [[VENTANA, '−10 min'], [VENTANA / 2, '−5 min'], [0, 'ahora']].forEach(([d, s]) => ctx.fillText(s, L + (1 - d / VENTANA) * pw, h - 6));
+
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .35;
+    ctx.beginPath(); ctx.moveTo(L, Y(UMB.ev1)); ctx.lineTo(L + pw, Y(UMB.ev1)); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    const serie = (key, color, esc) => {
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+      let abierto = false;
+      for (const p of pts) {
+        const v = p[key];
+        if (v == null || Number.isNaN(v)) { abierto = false; continue; }
+        const x = X(p.t), y = Y(esc(v));
+        if (!abierto) { ctx.moveTo(x, y); abierto = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    };
+    ctx.save(); ctx.beginPath(); ctx.rect(L, T - 2, pw, ph + 4); ctx.clip();
+    serie('n1', css('--t1'), v => v);
+    serie('n2', css('--t2'), v => v);
+    serie('ph', css('--accent'), v => clamp(v, 0, 14) / 14 * 100);
+    ctx.restore();
+
+    if (!pts.length) { ctx.fillStyle = muted; ctx.textAlign = 'center'; ctx.font = '13px Archivo, system-ui, sans-serif'; ctx.fillText('Sin datos todavía', L + pw / 2, T + ph / 2); }
+  }
+  return { push, reset, draw };
+})();
+
+// ---------------------------------------------------------------------------
+// Escena 3D (Three.js). Si no carga, el resto de la página sigue funcionando.
+// ---------------------------------------------------------------------------
+let escena = null;
+
+async function crearEscena3D(stage) {
+  const THREE = await import('three');
+  const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+  const { CSS2DRenderer, CSS2DObject } = await import('three/addons/renderers/CSS2DRenderer.js');
+  const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
+  const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  // ---- Renderizadores ----
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  stage.prepend(renderer.domElement);
+
+  const etiquetas = new CSS2DRenderer();
+  etiquetas.domElement.className = 'labels';
+  stage.insertBefore(etiquetas.domElement, renderer.domElement.nextSibling);
+
+  const scene = new THREE.Scene();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.55;
+
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.minDistance = 3; controls.maxDistance = 24;
+  controls.maxPolarAngle = Math.PI * 0.53;
+
+  const VISTAS = {
+    general: { pos: V3(1.6, 6.4, 16.5), target: V3(-0.3, 4.1, 0) },
+    t1:      { pos: V3(-0.9, 7.6, 7.0), target: V3(-3.0, 5.6, 0) },
+    filtros: { pos: V3(2.4, 4.9, 5.4),  target: V3(0.6, 3.5, 0) },
+    t2:      { pos: V3(4.8, 2.6, 5.2),  target: V3(2.2, 0.8, 0) },
+  };
+  camera.position.copy(VISTAS.general.pos);
+  controls.target.copy(VISTAS.general.target);
+  // En pantallas verticales la vista general se acerca para que el modelo llene el ancho
+  const GENERAL_ANCHA = VISTAS.general;
+  const GENERAL_ALTA = { pos: V3(0.6, 5.4, 14.2), target: V3(-0.4, 3.7, 0) };
+  let destino = null, tocada = false;
+  controls.addEventListener('start', () => { destino = null; tocada = true; });
+
+  // ---- Luces ----
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f8c, 0.7));
+  const sol = new THREE.DirectionalLight(0xffffff, 1.7);
+  sol.position.set(6, 13, 9);
+  sol.castShadow = true;
+  sol.shadow.mapSize.set(2048, 2048);
+  Object.assign(sol.shadow.camera, { left: -9, right: 9, top: 11, bottom: -4, near: 1, far: 40 });
+  sol.shadow.bias = -0.0005;
+  scene.add(sol);
+
+  // ---- Texturas de lienzo ----
+  function lienzo(w, h, dibujar) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    dibujar(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    return t;
+  }
+  const ruido = (ctx, w, h, n, a) => { for (let i = 0; i < n; i++) { const v = Math.random() * 255 | 0; ctx.fillStyle = `rgba(${v},${v},${v},${a})`; ctx.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1 + Math.random() * 2); } };
+  const texMuro = lienzo(256, 256, (c, w, h) => { c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); ruido(c, w, h, 5000, .18); });
+  texMuro.wrapS = texMuro.wrapT = THREE.RepeatWrapping; texMuro.repeat.set(6, 5);
+  const texAzulejo = lienzo(256, 256, (c, w, h) => { c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 4; c.strokeRect(0, 0, w, h); ruido(c, w, h, 600, .06); });
+  texAzulejo.wrapS = texAzulejo.wrapT = THREE.RepeatWrapping; texAzulejo.repeat.set(10, 5);
+  const texMadera = lienzo(128, 512, (c, w, h) => {
+    c.fillStyle = '#fff'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26; i++) { c.strokeStyle = `rgba(0,0,0,${.05 + Math.random() * .1})`; c.lineWidth = 1 + Math.random() * 2; c.beginPath(); const x = Math.random() * w; c.moveTo(x, 0); c.bezierCurveTo(x + 8, h * .3, x - 8, h * .6, x + 4, h); c.stroke(); }
+    ruido(c, w, h, 900, .08);
+  });
+  const texGranos = lienzo(128, 256, (c, w, h) => { c.fillStyle = '#1d1d1d'; c.fillRect(0, 0, w, h); for (let i = 0; i < 1400; i++) { const v = 25 + Math.random() * 60 | 0; c.fillStyle = `rgb(${v},${v},${v})`; c.beginPath(); c.arc(Math.random() * w, Math.random() * h, 1 + Math.random() * 2.4, 0, 7); c.fill(); } });
+  const texto = (txt, w = 128, h = 64, color = '#E9EEF0', fondo = null, size = 34) => lienzo(w, h, (c) => { if (fondo) { c.fillStyle = fondo; c.fillRect(0, 0, w, h); } c.fillStyle = color; c.font = `700 ${size}px Archivo, system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, w / 2, h / 2); });
+
+  // ---- Materiales ----
+  const M = {
+    muro: new THREE.MeshStandardMaterial({ map: texMuro, roughness: .95 }),
+    meson: new THREE.MeshStandardMaterial({ map: texAzulejo, roughness: .35 }),
+    piso: new THREE.MeshStandardMaterial({ roughness: .9 }),
+    madera: new THREE.MeshStandardMaterial({ map: texMadera, roughness: .85 }),
+    pvc: new THREE.MeshPhysicalMaterial({ color: 0xf4f5f1, roughness: .35, transparent: true, opacity: .42, depthWrite: false, side: THREE.DoubleSide }),
+    pvcSolido: new THREE.MeshStandardMaterial({ color: 0xf1f2ee, roughness: .4 }),
+    lamina: new THREE.MeshStandardMaterial({ color: 0xa7afb1, metalness: .65, roughness: .42, side: THREE.DoubleSide }),
+    negro: new THREE.MeshStandardMaterial({ color: 0x1b1c1d, roughness: .45 }),
+    gris: new THREE.MeshStandardMaterial({ color: 0x3a3f41, roughness: .5 }),
+    azulValvula: new THREE.MeshStandardMaterial({ color: 0x2d5cc8, metalness: .25, roughness: .4 }),
+    pcb: new THREE.MeshStandardMaterial({ color: 0x1f4fa6, roughness: .55 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0xc9ced0, metalness: .85, roughness: .3 }),
+    vidrio: new THREE.MeshPhysicalMaterial({ color: 0xdfeef2, roughness: .08, transparent: true, opacity: .35, depthWrite: false, side: THREE.DoubleSide }),
+    granos: new THREE.MeshStandardMaterial({ map: texGranos, roughness: .9 }),
+    cable: new THREE.MeshStandardMaterial({ color: 0x24292b, roughness: .6 }),
+    aguaLimpia: new THREE.MeshPhysicalMaterial({ color: 0x4b9fd8, roughness: .1, transparent: true, opacity: .7 }),
+    gota: new THREE.MeshStandardMaterial({ color: 0x4b9fd8, roughness: .2, emissive: 0x16405e, emissiveIntensity: .4 }),
+  };
+  const plastico = c => new THREE.MeshPhysicalMaterial({ color: c, roughness: .3, transparent: true, opacity: .26, depthWrite: false, side: THREE.DoubleSide });
+  const aguaMat = c => new THREE.MeshPhysicalMaterial({ color: c, roughness: .12, transparent: true, opacity: .62 });
+
+  function malla(geo, mat, x = 0, y = 0, z = 0, sombra = true) {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+    m.castShadow = sombra; m.receiveShadow = true; scene.add(m); return m;
+  }
+  function etiqueta(clase, x, y, z) {
+    const div = document.createElement('div'); div.className = 'lbl ' + clase;
+    div.innerHTML = '<b></b><span></span>';
+    const o = new CSS2DObject(div); o.position.set(x, y, z); scene.add(o);
+    return { div, b: div.firstChild, s: div.lastChild, o, set(t, sub = '') { if (this.b.textContent !== t) this.b.textContent = t; if (this.s.textContent !== sub) this.s.textContent = sub; } };
+  }
+
+  // ---- Entorno: muro, mesón de azulejo y piso ----
+  malla(new THREE.PlaneGeometry(26, 18), M.muro, -1, 6, -3, false);
+  malla(new THREE.BoxGeometry(10.4, 1.4, 5.6), M.meson, -1.8, -0.7, -0.2, false);
+  const piso = malla(new THREE.PlaneGeometry(30, 20), M.piso, 0, -1.4, 2, false); piso.rotation.x = -Math.PI / 2;
+  malla(new THREE.BoxGeometry(1.9, 4.0, 1.9), M.madera, -3.2, 2.0, 0);
+
+  // ---- Botellas (perfil tipo frasco como en las fotos) ----
+  const PERFIL = [[0, 0], [0.84, 0], [0.92, 0.22], [0.9, 0.6], [0.8, 0.98], [0.86, 1.3], [0.95, 1.75], [0.9, 2.15], [0.78, 2.45], [0.74, 2.6]];
+  function radioEn(p, y) {
+    for (let i = 1; i < p.length; i++) {
+      if (y <= p[i][1]) { const [r0, y0] = p[i - 1], [r1, y1] = p[i]; return y1 === y0 ? r1 : r0 + (r1 - r0) * (y - y0) / (y1 - y0); }
+    }
+    return p[p.length - 1][0];
+  }
+  function botella(x, y, er, eh, color) {
+    const p = PERFIL.map(([r, h]) => [r * er, h * eh]);
+    const H = p[p.length - 1][1];
+    const g = new THREE.Group(); g.position.set(x, y, 0); scene.add(g);
+    const casco = new THREE.Mesh(new THREE.LatheGeometry(p.map(([r, h]) => new THREE.Vector2(r, h)), 56), plastico(color));
+    casco.renderOrder = 3; g.add(casco);
+    const agua = new THREE.Mesh(new THREE.BufferGeometry(), aguaMat(color));
+    agua.renderOrder = 1; g.add(agua);
+    const marca = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012, 6, 64), new THREE.MeshBasicMaterial({ color: 0x1e2a2d, transparent: true, opacity: .55 }));
+    marca.rotation.x = Math.PI / 2; g.add(marca);
+    const b = { g, p, H, lleno: H * 0.94, agua, marca, nivel: -1, visto: 0, y0: y, x };
+    b.alturaAgua = pct => 0.03 + (b.lleno - 0.03) * clamp(pct, 0, 100) / 100;
+    b.ponerAgua = pct => {
+      if (Math.abs(pct - b.nivel) < 0.05) return;
+      b.nivel = pct;
+      const h = b.alturaAgua(pct);
+      b.agua.visible = pct > 0.3;
+      if (!b.agua.visible) return;
+      const pts = [new THREE.Vector2(0, 0.03)];
+      for (let i = 0; i <= 16; i++) { const yy = 0.03 + (h - 0.03) * i / 16; pts.push(new THREE.Vector2(radioEn(p, yy) * 0.96, yy)); }
+      pts.push(new THREE.Vector2(0, h));
+      b.agua.geometry.dispose();
+      b.agua.geometry = new THREE.LatheGeometry(pts, 48);
+    };
+    b.ponerMarca = pct => { const h = b.alturaAgua(pct); const r = radioEn(p, h) + 0.012; b.marca.position.y = h; b.marca.scale.set(r, r, 1); return h; };
+    return b;
+  }
+  const T1 = botella(-3.2, 4.0, 1, 1, 0x2fa57f);
+  const T2 = botella(1.6, 0, 0.92, 0.82, 0xc93a80);
+
+  // ---- Tuberías (PVC translúcido para ver el agua por dentro) ----
+  function camino(pts, R = 0.16) {
+    const v = pts.map(p => V3(...p)); const c = new THREE.CurvePath(); let ini = v[0];
+    for (let i = 1; i < v.length; i++) {
+      const cur = v[i];
+      if (i < v.length - 1) {
+        const sig = v[i + 1];
+        const a = cur.clone().add(ini.clone().sub(cur).setLength(Math.min(R, ini.distanceTo(cur) / 2)));
+        const b = cur.clone().add(sig.clone().sub(cur).setLength(Math.min(R, sig.distanceTo(cur) / 2)));
+        c.add(new THREE.LineCurve3(ini, a)); c.add(new THREE.QuadraticBezierCurve3(a, cur, b)); ini = b;
+      } else c.add(new THREE.LineCurve3(ini, cur));
+    }
+    return c;
+  }
+  function tubo(c, r, mat, orden = 0) {
+    const m = malla(new THREE.TubeGeometry(c, Math.max(24, Math.round(c.getLength() * 18)), r, 18, false), mat);
+    m.renderOrder = orden; if (mat.transparent) m.castShadow = false; return m;
+  }
+  function union(x, y, z, eje = 'x') {
+    const m = malla(new THREE.CylinderGeometry(0.135, 0.135, 0.18, 20), M.pvcSolido, x, y, z);
+    if (eje === 'x') m.rotation.z = Math.PI / 2; return m;
+  }
+  // Partículas de agua que recorren un camino cuando hay flujo
+  function corriente(c, mat, radio = 0.055, densidad = 6) {
+    const largo = c.getLength(), n = Math.max(4, Math.round(largo * densidad));
+    const m = new THREE.InstancedMesh(new THREE.SphereGeometry(radio, 10, 8), mat, n);
+    m.visible = false; m.renderOrder = 1; scene.add(m);
+    const mat4 = new THREE.Matrix4(); let fase = Math.random();
+    return {
+      mover(dt, activo, vel) {
+        m.visible = activo; if (!activo) return;
+        if (!reducirMovimiento) fase = (fase + dt * vel / largo) % 1;
+        for (let i = 0; i < n; i++) { const p = c.getPointAt((i / n + fase) % 1); mat4.makeTranslation(p.x, p.y, p.z); m.setMatrixAt(i, mat4); }
+        m.instanceMatrix.needsUpdate = true;
+      },
+    };
+  }
+  // Chorro vertical (cae entre dos alturas)
+  function chorro(x, z, mat) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 1, 10, 1, true), mat);
+    m.renderOrder = 1; m.visible = false; scene.add(m);
+    return { m, poner(activo, yArriba, yAbajo) { m.visible = activo && yArriba > yAbajo + 0.02; if (!m.visible) return; const h = yArriba - yAbajo; m.scale.set(1 + Math.random() * .15, h, 1); m.position.set(x, yAbajo + h / 2, z); } };
+  }
+
+  // Techo de lámina acanalada, anclado al muro, con canaleta
+  const geoTecho = new THREE.PlaneGeometry(4.6, 4.4, 1, 60);
+  const pos = geoTecho.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, 0.05 * Math.sin(pos.getY(i) * Math.PI * 2 / 0.3));
+  geoTecho.computeVertexNormals();
+  geoTecho.rotateX(-Math.PI / 2);
+  const INCL = 0.2;
+  const techo = malla(geoTecho, M.lamina, -2.6, 8.5, -0.8); techo.rotation.z = -INCL;
+  const yTecho = x => 8.5 - (x + 2.6) * Math.tan(INCL);
+  const canaleta = malla(new THREE.CylinderGeometry(0.17, 0.17, 4.4, 20, 1, true, 0, Math.PI), M.pvcSolido, -0.32, yTecho(-0.32) - 0.12, -0.8);
+  canaleta.rotation.x = Math.PI / 2; canaleta.material = M.pvcSolido.clone(); canaleta.material.side = THREE.DoubleSide;
+
+  const cBajante = camino([[-0.32, 7.9, 0], [-0.32, 7.25, 0], [-2.8, 7.25, 0], [-2.8, 6.78, 0]]);
+  tubo(cBajante, 0.1, M.pvc, 2);
+  const fBajante = corriente(cBajante, M.gota, 0.05);
+
+  // T1 -> EV1 -> filtro 1 -> codo -> filtro 2
+  const yP = 4.4;
+  const cLinea1 = camino([[-2.3, yP, 0], [1.6, yP, 0], [1.6, 4.06, 0]]);
+  tubo(cLinea1, 0.1, M.pvc, 2);
+  union(-2.2, yP, 0); union(-0.95, yP, 0); union(0.45, yP, 0);
+  const aguaQuieta1 = tubo(camino([[-2.3, yP, 0], [-1.78, yP, 0]]), 0.075, aguaMat(0x2fa57f), 1);
+  const fLinea1 = corriente(camino([[-1.22, yP, 0], [1.6, yP, 0], [1.6, 4.06, 0]]), M.gota);
+
+  // Electroválvula: cuerpo azul, tuercas, bobina con etiqueta y LED
+  function electrovalvula(x, y, nombre) {
+    const g = new THREE.Group(); g.position.set(x, y, 0); scene.add(g);
+    const add = (geo, mat, px, py, pz) => { const m = new THREE.Mesh(geo, mat); m.position.set(px, py, pz); m.castShadow = true; g.add(m); return m; };
+    add(new THREE.BoxGeometry(0.55, 0.3, 0.34), M.azulValvula, 0, 0, 0);
+    [-0.33, 0.33].forEach(px => { const t = add(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 6), M.azulValvula, px, 0, 0); t.rotation.z = Math.PI / 2; });
+    add(new THREE.BoxGeometry(0.36, 0.42, 0.36), new THREE.MeshStandardMaterial({ color: 0x2a3134, roughness: .5 }), 0, 0.36, 0);
+    add(new THREE.PlaneGeometry(0.3, 0.15), new THREE.MeshBasicMaterial({ map: texto(nombre), transparent: true }), 0, 0.42, 0.181);
+    const led = add(new THREE.SphereGeometry(0.035, 12, 8), new THREE.MeshStandardMaterial({ color: 0x59605f, emissive: 0x000000 }), 0, 0.27, 0.185);
+    return { g, poner(abierta, bloqueada) { const c = abierta ? 0x3ce07a : (bloqueada ? 0xe5655b : 0x000000); led.material.emissive.setHex(c); led.material.emissiveIntensity = abierta || bloqueada ? 1.6 : 0; } };
+  }
+  const EV1 = electrovalvula(-1.5, yP, 'EV1');
+
+  // Filtro 1: carcasa negra colgando del tubo, con visor de sedimentos
+  malla(new THREE.BoxGeometry(0.78, 0.34, 0.62), M.negro, -0.25, yP, 0);
+  malla(new THREE.CylinderGeometry(0.31, 0.29, 1.35, 32), M.negro, -0.25, yP - 0.17 - 0.67, 0);
+  const anillo = malla(new THREE.TorusGeometry(0.33, 0.04, 8, 32), M.gris, -0.25, yP - 0.42, 0); anillo.rotation.x = Math.PI / 2;
+  const visor = malla(new THREE.BoxGeometry(0.17, 0.72, 0.04), new THREE.MeshStandardMaterial({ color: 0xc7b99a, roughness: .7 }), -0.25, yP - 0.95, 0.3, false);
+
+  // Filtro 2: columna transparente con carbón activado
+  malla(new THREE.CylinderGeometry(0.35, 0.35, 0.14, 32), M.gris, 1.6, 4.0, 0);
+  malla(new THREE.CylinderGeometry(0.35, 0.35, 0.14, 32), M.gris, 1.6, 2.42, 0);
+  malla(new THREE.CylinderGeometry(0.25, 0.25, 1.42, 32), M.granos, 1.6, 3.21, 0);
+  const tuboCarbon = malla(new THREE.CylinderGeometry(0.29, 0.29, 1.46, 32, 1, true), M.vidrio, 1.6, 3.21, 0, false); tuboCarbon.renderOrder = 3;
+  const cSalidaCarbon = camino([[1.6, 2.35, 0], [1.6, 2.2, 0]]);
+  tubo(cSalidaCarbon, 0.09, M.pvcSolido);
+  const chT2 = chorro(1.6, 0, M.aguaLimpia);
+
+  // T2 -> EV2 -> caño -> vaso
+  const yS = 0.35;
+  const cLinea2 = camino([[2.42, yS, 0], [3.95, yS, 0], [3.95, -0.45, 0]]);
+  tubo(cLinea2, 0.1, M.pvc, 2);
+  union(2.5, yS, 0);
+  const aguaQuieta2 = tubo(camino([[2.42, yS, 0], [2.83, yS, 0]]), 0.075, M.aguaLimpia, 1);
+  const fLinea2 = corriente(camino([[3.38, yS, 0], [3.95, yS, 0], [3.95, -0.45, 0]]), M.gota);
+  const EV2 = electrovalvula(3.1, yS, 'EV2');
+  const vaso = malla(new THREE.CylinderGeometry(0.3, 0.25, 0.7, 32, 1, true), M.vidrio, 3.95, -1.05, 0, false); vaso.renderOrder = 3;
+  malla(new THREE.CylinderGeometry(0.25, 0.25, 0.02, 32), M.vidrio, 3.95, -1.39, 0, false);
+  const aguaVaso = malla(new THREE.CylinderGeometry(0.27, 0.245, 0.35, 32), M.aguaLimpia, 3.95, -1.2, 0, false); aguaVaso.visible = false;
+  const chVaso = chorro(3.95, 0, M.aguaLimpia);
+
+  // Chorro de la bajante al tanque 1
+  const chT1 = chorro(-2.8, 0, M.aguaLimpia);
+
+  // Sensores ultrasónicos HC-SR04 sobre una barra en la boca de cada tanque
+  function ultrasonico(x, y, largoBarra) {
+    const g = new THREE.Group(); g.position.set(x, y, 0); scene.add(g);
+    const barra = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, largoBarra, 10), M.metal); barra.rotation.x = Math.PI / 2; barra.position.y = 0.05; g.add(barra);
+    const placa = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.04, 0.27), M.pcb); placa.position.y = 0.1; placa.castShadow = true; g.add(placa);
+    [-0.14, 0.14].forEach(px => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.14, 20), M.metal); c.position.set(px, 0.01, 0); g.add(c); });
+    // Ondas de eco: anillos que bajan del sensor hasta la superficie del agua
+    const anillos = [0, 1, 2].map(() => {
+      const r = new THREE.Mesh(new THREE.RingGeometry(0.07, 0.1, 40), new THREE.MeshBasicMaterial({ color: 0x2652b8, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+      r.rotation.x = -Math.PI / 2; r.renderOrder = 4; scene.add(r); return r;
+    });
+    let t = 0;
+    return {
+      mover(dt, ySuperficie, falla) {
+        t += dt;
+        const y0 = y - 0.08;
+        anillos.forEach((r, i) => {
+          r.position.x = x;
+          if (falla) { r.material.color.setHex(0xe5655b); r.position.y = y0 - 0.02; r.scale.setScalar(1.4); r.material.opacity = (Math.floor(t * 2) % 2) ? 0.85 : 0.1; return; }
+          r.material.color.setHex(0x2652b8);
+          const f = reducirMovimiento ? i / 3 : (t * 0.9 + i / 3) % 1;
+          r.position.y = y0 - f * Math.max(0.1, y0 - ySuperficie);
+          r.scale.setScalar(1 + f * 2.6);
+          r.material.opacity = (1 - f) * 0.85;
+        });
+      },
+    };
+  }
+  const US1 = ultrasonico(-3.45, T1.y0 + T1.H + 0.02, 1.4);
+  const US2 = ultrasonico(1.98, T2.y0 + T2.H + 0.02, 1.1);
+
+  // Electrodo de pH dentro del tanque 2, con cable al módulo PH-4502C
+  const xE = 1.25, zE = 0.25;
+  malla(new THREE.CylinderGeometry(0.045, 0.045, 2.32, 16), M.vidrio, xE, 1.44, zE, false).renderOrder = 3;
+  malla(new THREE.SphereGeometry(0.075, 16, 12), M.vidrio, xE, 0.26, zE, false).renderOrder = 3;
+  malla(new THREE.CylinderGeometry(0.06, 0.06, 0.18, 16), M.negro, xE, 2.68, zE);
+  tubo(new THREE.CatmullRomCurve3([V3(xE, 2.77, zE), V3(1.15, 3.05, 0.55), V3(0.7, 2.3, 0.95), V3(0.15, 0.45, 1.05), V3(-0.05, 0.08, 1.05)]), 0.025, M.cable);
+  malla(new THREE.BoxGeometry(0.75, 0.05, 0.45), M.pcb, -0.35, 0.025, 1.05);
+  const rotulo = malla(new THREE.PlaneGeometry(0.5, 0.14), new THREE.MeshBasicMaterial({ map: texto('PH-4502C', 256, 64, '#E9EEF0', null, 40), transparent: true }), -0.42, 0.052, 1.05, false);
+  rotulo.rotation.x = -Math.PI / 2;
+  const bnc = malla(new THREE.CylinderGeometry(0.06, 0.06, 0.12, 16), M.metal, -0.02, 0.1, 1.05); bnc.rotation.x = Math.PI / 2;
+
+  // Lluvia: segmentos que caen sobre el techo
+  const N_GOTAS = 700;
+  const gotasPos = new Float32Array(N_GOTAS * 6);
+  const gotas = [];
+  for (let i = 0; i < N_GOTAS; i++) { const x = -4.8 + Math.random() * 4.4, z = -2.8 + Math.random() * 4.1; gotas.push({ x, z, y: yTecho(x) + Math.random() * (11.5 - yTecho(x)) }); }
+  const geoLluvia = new THREE.BufferGeometry(); geoLluvia.setAttribute('position', new THREE.BufferAttribute(gotasPos, 3));
+  const lluvia = new THREE.LineSegments(geoLluvia, new THREE.LineBasicMaterial({ color: 0x7fb7de, transparent: true, opacity: .7 }));
+  lluvia.frustumCulled = false; scene.add(lluvia);
+  function moverLluvia(dt, intensidad) {
+    const activas = Math.round(N_GOTAS * intensidad / 100);
+    geoLluvia.setDrawRange(0, activas * 2);
+    lluvia.visible = activas > 0;
+    if (!activas) return;
+    const v = reducirMovimiento ? 0 : 9;
+    for (let i = 0; i < activas; i++) {
+      const g = gotas[i]; g.y -= v * dt;
+      const piso = yTecho(g.x) + 0.08;
+      if (g.y < piso) g.y = 11.5 - Math.random() * 0.8;
+      gotasPos.set([g.x, g.y, g.z, g.x - 0.02, g.y + 0.28, g.z], i * 6);
+    }
+    geoLluvia.attributes.position.needsUpdate = true;
+  }
+
+  // ---- Etiquetas en vivo ----
+  const L = {
+    lluvia: etiqueta('minor', 0.3, 8.6, -0.2),
+    us1: etiqueta('', -3.45, 7.2, 0),
+    t1: etiqueta('big t1', -3.2, 5.3, 1.05),
+    ev1: etiqueta('', -1.5, 5.15, 0),
+    f1: etiqueta('minor', -0.25, 2.55, 0.4),
+    f2: etiqueta('minor', 2.35, 3.3, 0),
+    us2: etiqueta('', 2.1, 2.62, 0.2),
+    t2: etiqueta('big t2', 1.6, 0.95, 1.0),
+    ph: etiqueta('', -0.35, 0.45, 1.25),
+    ev2: etiqueta('', 3.1, 1.05, 0),
+    out: etiqueta('minor', 3.95, -0.45, 0.45),
+    m1: etiqueta('mark minor', -3.2 + 1.08, 0, 0),
+    m2: etiqueta('mark minor', 1.6 + 0.98, 0, 0),
+  };
+  L.f1.set('Filtro 1', 'sedimentos');
+  L.f2.set('Filtro 2', 'carbón activado');
+
+  // ---- Estado y animación ----
+  let E = null;
+  const visto = { n1: 0, n2: 0 };
+
+  function umbrales(u1, u2) {
+    const h1 = T1.ponerMarca(u1), h2 = T2.ponerMarca(u2);
+    L.m1.o.position.y = T1.y0 + h1; L.m1.set(u1 + ' %');
+    L.m2.o.position.y = T2.y0 + h2; L.m2.set(u2 + ' %');
+  }
+
+  function aplicarTema() {
+    M.muro.color.set(css('--stage-wall'));
+    M.meson.color.set(css('--stage-counter'));
+    M.piso.color.set(css('--stage-floor'));
+    M.madera.color.set(css('--stage-wood'));
+  }
+  aplicarTema();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', aplicarTema);
+
+  function actualizar(e) {
+    E = e;
+    const bloq = m => /Falla|pH|bater/i.test(m || '');
+    EV1.poner(e.ev1, !e.ev1 && bloq(e.m1));
+    EV2.poner(e.ev2, !e.ev2 && bloq(e.m2));
+    visor.material.color.setHex(e.saturado ? 0x5b4426 : 0xc7b99a);
+
+    L.lluvia.set(e.lluvia == null ? 'Lluvia' : `Lluvia ${e.lluvia} mm/h`, e.flujo ? `${fmt(e.flujo.lluvia, 2)} L/s al tanque 1` : 'no medida por el equipo');
+    L.us1.set(e.t1.f ? 'US1 · sin eco' : `US1 · ${fmt(e.t1.d, 1)} cm`);
+    L.us2.set(e.t2.f ? 'US2 · sin eco' : `US2 · ${fmt(e.t2.d, 1)} cm`);
+    L.us1.div.classList.toggle('bad', e.t1.f); L.us2.div.classList.toggle('bad', e.t2.f);
+    L.t1.set(e.vis1 == null ? '--' : Math.round(e.vis1) + ' %', e.vis1 == null ? '' : Math.round(e.vis1 * CFG.cap / 100) + ' L' + (e.rebosa ? ' · rebosando' : ''));
+    L.t2.set(e.vis2 == null ? '--' : Math.round(e.vis2) + ' %', e.vis2 == null ? '' : Math.round(e.vis2 * CFG.cap / 100) + ' L');
+    const flujo1 = e.ev1 && (e.flujo ? e.flujo.ev1 > 0.001 : true);
+    const flujo2 = e.ev2 && (e.flujo ? e.flujo.ev2 > 0.001 : true);
+    L.ev1.set('EV1 ' + (e.ev1 ? 'abierta' : 'cerrada'), e.flujo && flujo1 ? `${fmt(e.flujo.ev1, 2)} L/s` : '');
+    L.ev2.set('EV2 ' + (e.ev2 ? 'abierta' : 'cerrada'), e.flujo && flujo2 ? `${fmt(e.flujo.ev2, 2)} L/s` : '');
+    L.ev1.div.classList.toggle('on', e.ev1); L.ev2.div.classList.toggle('on', e.ev2);
+    L.ph.set(e.ph == null ? 'Electrodo de pH' : `pH ${fmt(e.ph, 2)}`, e.phSeco ? 'electrodo fuera del agua' : (e.phv == null ? '' : `Po = ${fmt(e.phv, 3)} V`));
+    L.ph.div.classList.toggle('bad', e.ph != null && !e.phok);
+    L.out.set('Agua apta', e.entregado == null ? '' : `${Math.round(e.entregado)} L entregados`);
+  }
+
+  function vista(nombre) { destino = VISTAS[nombre] || VISTAS.general; if (reducirMovimiento) { camera.position.copy(destino.pos); controls.target.copy(destino.target); destino = null; } }
+  function mostrarEtiquetas(si) { stage.classList.toggle('no-labels', !si); }
+
+  function ajustar() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false); etiquetas.setSize(w, h);
+    const vertical = w / h < 0.95;
+    camera.aspect = w / h;
+    camera.fov = vertical ? 50 : 38;   // en pantallas verticales se abre el encuadre
+    camera.updateProjectionMatrix();
+    stage.classList.toggle('compact', w < 560);
+    const general = vertical ? GENERAL_ALTA : GENERAL_ANCHA;
+    if (VISTAS.general !== general) {
+      VISTAS.general = general;
+      if (!tocada && !destino) { camera.position.copy(general.pos); controls.target.copy(general.target); }
+    }
+  }
+  new ResizeObserver(ajustar).observe(stage); ajustar();
+
+  const reloj3d = new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    const dt = Math.min(0.05, reloj3d.getDelta());
+    if (destino) {
+      const k = 1 - Math.pow(0.002, dt);
+      camera.position.lerp(destino.pos, k); controls.target.lerp(destino.target, k);
+      if (camera.position.distanceTo(destino.pos) < 0.02) destino = null;
+    }
+    controls.update();
+
+    if (E) {
+      const k = 1 - Math.pow(0.02, dt);
+      visto.n1 += ((E.vis1 ?? 0) - visto.n1) * k;
+      visto.n2 += ((E.vis2 ?? 0) - visto.n2) * k;
+      T1.ponerAgua(visto.n1); T2.ponerAgua(visto.n2);
+      const ySup1 = T1.y0 + T1.alturaAgua(visto.n1), ySup2 = T2.y0 + T2.alturaAgua(visto.n2);
+      US1.mover(dt, ySup1, E.t1.f); US2.mover(dt, ySup2, E.t2.f);
+
+      const lloviendo = E.lluvia != null && E.lluvia > 0;
+      moverLluvia(dt, E.lluvia ?? 0);
+      fBajante.mover(dt, lloviendo, 1 + E.lluvia / 40);
+      chT1.poner(lloviendo, 6.78, ySup1);
+
+      const flujo1 = E.ev1 && (E.flujo ? E.flujo.ev1 > 0.001 : true);
+      const flujo2 = E.ev2 && (E.flujo ? E.flujo.ev2 > 0.001 : true);
+      aguaQuieta1.visible = visto.n1 > 0.5;
+      aguaQuieta2.visible = visto.n2 > 2;
+      fLinea1.mover(dt, flujo1, 0.8 + (E.flujo ? E.flujo.ev1 * 1.5 : 1));
+      chT2.poner(flujo1, 2.2, ySup2);
+      fLinea2.mover(dt, flujo2, 0.8 + (E.flujo ? E.flujo.ev2 * 2 : 1));
+      chVaso.poner(flujo2, -0.45, -1.05);
+      aguaVaso.visible = flujo2 || (E.entregado ?? 0) > 0.5;
+    }
+    renderer.render(scene, camera);
+    etiquetas.render(scene, camera);
+  });
+
+  return { actualizar, umbrales, vista, mostrarEtiquetas };
+}
+
+// ---------------------------------------------------------------------------
+// Ciclo principal
+// ---------------------------------------------------------------------------
+let fuente = 'sim';
+let ultimoPuntoSim = -1e9, ultimoDibujo = 0;
+
+function pintarEscena(e) {
+  $('clock').textContent = e.fuente === 'sim' ? `Tiempo simulado ${reloj(e.reloj)} · ${ctl.vel}×${ctl.pausa ? ' · en pausa' : ''}` : '';
+  if (escena) escena.actualizar(e);
+}
+
+function pintar(e) {
+  pintarEscena(e);
+  pintarPanel(e);
+  registrar(e);
+}
+
+function tick() {
+  if (fuente === 'sim') {
+    if (!ctl.pausa) {
+      const n = Math.round(ctl.vel);                // n pasos de 0,1 s simulados por cada 100 ms reales
+      for (let i = 0; i < n; i++) {
+        paso(0.1);
+        if (sim.t - ultimoPuntoSim >= 2) { ultimoPuntoSim = sim.t; const u = sim.us; grafica.push(sim.t, u[0].listo ? u[0].n : null, u[1].listo ? u[1].n : null, sim.phValido ? sim.phVal : null); }
+      }
+    }
+    pintar(estadoSim());
+  } else if (real.ultimo) {
+    real.ultimo.edad += 0.1;
+    pintarPanel(real.ultimo);
+  }
+  const ahora = performance.now();
+  if (ahora - ultimoDibujo > 250) {
+    ultimoDibujo = ahora;
+    grafica.draw(fuente === 'sim' ? sim.t : Date.now() / 1000);
+  }
+}
+
+function cambiarFuente(f) {
+  if (f === fuente) return;
+  fuente = f;
+  $('src-sim').setAttribute('aria-pressed', f === 'sim');
+  $('src-real').setAttribute('aria-pressed', f === 'real');
+  $('app').classList.toggle('is-real', f === 'real');
+  $('cap').textContent = f === 'sim'
+    ? 'Arrastra para girar y usa la rueda o dos dedos para acercar. Las tuberías se ven por dentro para seguir el agua.'
+    : 'Datos enviados por el ESP32 cada 5 s. El modelo dibuja lo que miden sus sensores.';
+  limpiarRegistro();
+  grafica.reset();
+  clearInterval(real.timer);
+  if (f === 'real') {
+    real.primera = true; real.ultimo = null; real.ultimoTs = null;
+    estadoConexion('warn', 'Conectando con el servidor…');
+    pintar({ ...estadoReal({ ts: Date.now() }, 0), sinDatos: true });
+    sondear();
+    real.timer = setInterval(sondear, 3000);
+  } else {
+    ultimoPuntoSim = -1e9;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Controles
+// ---------------------------------------------------------------------------
+function enlazarRango(id, out, key, txt) {
+  const el = $(id);
+  const upd = () => { ctl[key] = parseFloat(el.value); $(out).textContent = txt(ctl[key]); };
+  el.addEventListener('input', upd); upd();
+}
+enlazarRango('in-rain', 'o-rain', 'lluvia', v => v === 0 ? 'Sin lluvia' : `${v} mm/h`);
+enlazarRango('in-phr', 'o-phr', 'phLluvia', v => 'pH ' + fmt(v, 1));
+enlazarRango('in-use', 'o-use', 'consumo', v => `${fmt(v, 2)} L/s`);
+
+function segmento(id, alElegir) {
+  $(id).addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    alElegir(b.dataset.v);
+  });
+}
+segmento('speed', v => { ctl.vel = +v; });
+segmento('views', v => escena?.vista(v));
+$('b-labels').addEventListener('click', () => {
+  const si = $('b-labels').getAttribute('aria-pressed') !== 'true';
+  $('b-labels').setAttribute('aria-pressed', si);
+  escena?.mostrarEtiquetas(si);
+});
+$('b-pause').addEventListener('click', () => { ctl.pausa = !ctl.pausa; $('b-pause').textContent = ctl.pausa ? 'Reanudar' : 'Pausar'; });
+$('b-reset').addEventListener('click', () => {
+  sim = nuevaSim(); grafica.reset(); limpiarRegistro(); ultimoPuntoSim = -1e9; marcarModo();
+});
+
+function marcarModo() {
+  $('mode').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', (x.dataset.v === 'manual') === sim.manual));
+}
+function ponerManual(m) {
+  if (m && !sim.manual) { sim.ev1.pedido = sim.ev1.abierta; sim.ev2.pedido = sim.ev2.abierta; }
+  sim.manual = m; marcarModo(); controlar();
+}
+$('mode').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) ponerManual(b.dataset.v === 'manual'); });
+document.querySelectorAll('[data-ev]').forEach(b => b.addEventListener('click', () => {
+  if (!sim.manual) ponerManual(true);
+  sim[b.dataset.ev === '1' ? 'ev1' : 'ev2'].pedido = b.dataset.on === '1';
+  controlar();
+}));
+
+function marcas() { escena?.umbrales(UMB.ev1, UMB.ev2); }
+[['u-ev1', 'ev1'], ['u-ev2', 'ev2'], ['u-cerrar', 'cerrar'], ['u-lleno', 'lleno']].forEach(([id, k]) => {
+  $(id).addEventListener('change', ev => {
+    const el = ev.target;
+    const v = clamp(Math.round(parseFloat(el.value) || 0), +el.min, +el.max);
+    el.value = v; UMB[k] = v; marcas();
+  });
+});
+
+$('f-us1').addEventListener('change', e => { ctl.falla1 = e.target.checked; });
+$('f-us2').addEventListener('change', e => { ctl.falla2 = e.target.checked; });
+$('f-clog').addEventListener('change', e => { ctl.saturado = e.target.checked; });
+document.querySelectorAll('[data-phr]').forEach(b => b.addEventListener('click', () => {
+  $('in-phr').value = b.dataset.phr; $('in-phr').dispatchEvent(new Event('input'));
+}));
+
+$('src-sim').addEventListener('click', () => cambiarFuente('sim'));
+$('src-real').addEventListener('click', () => cambiarFuente('real'));
+
+// Arranque: la simulación corre aunque el 3D tarde o no cargue
+sim = nuevaSim();
+if (new URLSearchParams(location.search).get('fuente') === 'real') cambiarFuente('real');
+setInterval(tick, 100);
+tick();
+
+crearEscena3D($('stage')).then(s => {
+  escena = s;
+  $('stage-msg').hidden = true;
+  marcas();
+  if (fuente === 'real' && real.ultimo) escena.actualizar(real.ultimo);
+}).catch(err => {
+  console.error(err);
+  $('stage-msg').textContent = 'No se pudo cargar el modelo 3D (revisa la conexión a internet o que el navegador tenga WebGL activo). Los sensores y la gráfica siguen funcionando.';
+});
+</script>
+</body>
+</html>
