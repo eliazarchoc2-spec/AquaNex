@@ -50,8 +50,8 @@ Al inicio del código, en el bloque **CONFIGURACIÓN**:
 ## 7. Conexión del sensor de pH
 El firmware lee el **único** sensor de pH en **IO3** (módulo U6, "después del filtro", tanque 2). El módulo U5 / IO2 del esquemático no se usa: no hace falta armarlo.
 
-## 8. Monitoreo en la nube (opcional)
-Para ver el equipo desde internet en la página desplegada en Vercel (carpeta `web/`, ver `web/README.md`):
+## 8. Monitoreo en la nube (opcional, desactivado por ahora)
+La página web quedó como **simulación**: ya no incluye el modo «equipo real». El envío a la nube sigue en el firmware por si más adelante se retoma el montaje físico; ahí se vuelve a conectar.
 
 1. En el bloque **CONFIGURACIÓN** llena `WIFI_SSID` y `WIFI_PASS` (una red con internet, de 2,4 GHz), `NUBE_URL` (`https://tu-proyecto.vercel.app/api/telemetry`) y `DEVICE_KEY` (la misma clave que pusiste en Vercel).
 2. Cambia `USAR_NUBE` a `true` y sube el código.

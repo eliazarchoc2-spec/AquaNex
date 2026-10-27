@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Potabilizadora P12</title>
-<meta name="description" content="Simulación 3D del prototipo de potabilizadora de agua lluvia y monitoreo en vivo del equipo real.">
+<meta name="description" content="Simulación 3D del prototipo de potabilizadora de agua lluvia: niveles, pH y válvulas explicados en tiempo real.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
@@ -70,6 +70,10 @@ button,input,select{font:inherit;color:inherit}
 .brand p{margin:6px 0 0;color:var(--muted);max-width:60ch}
 .source{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .status{font-size:.9rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+.sim-badge{
+  margin:0; font-size:.78rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--accent); border:1px solid currentColor; border-radius:99px; padding:3px 10px;
+}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--off);flex:none}
 .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
 
@@ -155,7 +159,6 @@ button,input,select{font:inherit;color:inherit}
 .chip.ok{background:var(--ok)} .chip.bad{background:var(--bad)} .chip.warn{background:var(--warn)}
 .valve-state{font-size:1.15rem;font-weight:740;font-variation-settings:"wdth" 80}
 .valve-state.open{color:var(--ok)}
-.stale .rows{opacity:.55}
 
 /* ---------- Controles ---------- */
 .controls fieldset{border:0;margin:0;padding:12px 0;border-top:1px solid var(--line)}
@@ -174,10 +177,31 @@ button,input,select{font:inherit;color:inherit}
 .thr input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--wall);font-variant-numeric:tabular-nums}
 .chk{display:flex;gap:8px;align-items:center;margin:6px 0;font-size:.92rem}
 .chk input{accent-color:var(--bad);width:16px;height:16px}
-.realnote{display:none}
-.is-real .simonly{display:none}
-.is-real .realnote{display:block}
-.is-real .row.realnote{display:grid}
+/* ---------- pH explicado ---------- */
+.ph-card{border-top:1px solid var(--line);padding:12px 0 10px}
+.ph-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.ph-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ph-num b{display:block;font-size:2.2rem;line-height:1;font-weight:760;font-variation-settings:"wdth" 70}
+.ph-word{display:block;font-size:.85rem;font-weight:660;margin-top:3px}
+.ph-word.ok{color:var(--ok)} .ph-word.bad{color:var(--bad)} .ph-word.warn{color:var(--warn)}
+.ph-scale{
+  position:relative; height:12px; border-radius:6px; margin:13px 0 0;
+  background:linear-gradient(90deg,#c9483d 0%,#dd8a2c 30%,#3f9c52 45%,#3f9c52 61%,#35789f 77%,#5f52a8 100%);
+}
+.ph-scale::before,.ph-scale::after{content:"";position:absolute;top:0;bottom:0;background:rgb(0 0 0/.38)}
+.ph-scale::before{left:0;width:calc(6.5 / 14 * 100%);border-radius:6px 0 0 6px}
+.ph-scale::after{right:0;width:calc(5.5 / 14 * 100%);border-radius:0 6px 6px 0}
+.ph-mark{
+  position:absolute; top:50%; left:50%; width:15px; height:15px; margin:-7.5px 0 0 -7.5px;
+  border-radius:50%; background:var(--surface); border:3px solid var(--ink);
+  box-shadow:0 1px 3px rgb(0 0 0/.35); transition:left .35s ease;
+}
+.ph-ticks{position:relative;height:15px;margin-top:7px;font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.ph-ticks span{position:absolute;top:0;transform:translateX(-50%)}
+.ph-ticks span:first-child{left:0;transform:none}
+.ph-ticks span:last-child{right:0;transform:none}
+.ph-say{margin:9px 0 0;font-size:.9rem;line-height:1.4}
+.ph-say b{font-weight:700}
 
 /* ---------- Gráfica y registro ---------- */
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.85rem;color:var(--muted)}
@@ -197,18 +221,15 @@ button,input,select{font:inherit;color:inherit}
 <header class="top">
   <div class="brand">
     <h1>Potabilizadora P12</h1>
-    <p>Agua de lluvia del techo, dos filtros y un control de pH antes de entregarla. Simula el prototipo en 3D o mira el equipo real en vivo.</p>
+    <p>Agua de lluvia del techo, dos filtros y un control de pH antes de entregarla. La simulación reproduce el prototipo y muestra, en tiempo real, cómo responde la planta.</p>
   </div>
   <div class="source">
-    <div class="seg" role="group" aria-label="Fuente de datos">
-      <button type="button" id="src-sim" aria-pressed="true">Simulación</button>
-      <button type="button" id="src-real" aria-pressed="false">ESP32 real</button>
-    </div>
+    <p class="sim-badge">Simulación en vivo</p>
     <div class="status" aria-live="polite"><span class="dot" id="st-dot"></span><span id="st-txt">Iniciando…</span></div>
   </div>
 </header>
 
-<main class="layout" id="app">
+<main class="layout">
   <!-- ===================== Escena 3D ===================== -->
   <figure class="scene">
     <div class="stage" id="stage" role="img" aria-label="Modelo 3D del prototipo: techo, tanque 1, electroválvula 1, filtro de sedimentos, filtro de carbón activado, tanque 2, electrodo de pH y electroválvula 2">
@@ -243,12 +264,22 @@ button,input,select{font:inherit;color:inherit}
         <div class="r-sub" id="v-d2">sin lectura</div>
         <span class="chip" id="c-us2">--</span>
       </div>
-      <div class="row">
-        <div class="r-name"><span class="sw ph"></span><span>Sensor de pH<small>Electrodo en el tanque 2</small></span></div>
-        <div class="r-val"><b id="v-ph">--</b></div>
-        <div class="r-sub" id="v-phv">--</div>
-        <span class="chip" id="c-ph">--</span>
+
+      <div class="ph-card">
+        <div class="ph-head">
+          <div class="r-name"><span class="sw ph"></span><span>Acidez del agua<small>Sensor de pH en el tanque 2</small></span></div>
+          <div class="ph-num">
+            <b id="v-ph">--</b>
+            <span class="ph-word" id="v-phw">sin lectura</span>
+          </div>
+        </div>
+        <div class="ph-scale" role="img" aria-label="Escala de pH de 0 a 14, con la zona apta entre 6,5 y 8,5 marcada">
+          <span class="ph-mark" id="v-phmark" hidden></span>
+        </div>
+        <div class="ph-ticks"><span>0 · ácido</span><span style="left:46.43%">6,5</span><span style="left:60.71%">8,5</span><span>14 · alcalino</span></div>
+        <p class="ph-say" id="v-phsay">Esperando la primera lectura del electrodo.</p>
       </div>
+
       <div class="row">
         <div class="r-name"><span class="sw"></span><span>Electroválvula EV1<small>Tanque 1 → filtros → tanque 2</small></span></div>
         <div class="r-val"><span class="valve-state" id="v-ev1s">--</span></div>
@@ -259,21 +290,13 @@ button,input,select{font:inherit;color:inherit}
         <div class="r-val"><span class="valve-state" id="v-ev2s">--</span></div>
         <div class="r-sub" id="v-m2"></div>
       </div>
-      <div class="row realnote">
-        <div class="r-name"><span class="sw"></span><span>Batería 12 V<small>Alimentación de las válvulas</small></span></div>
-        <div class="r-val"><b id="v-bat">--</b><span class="u">V</span></div>
-        <div class="r-sub"></div>
-        <span class="chip" id="c-bat">--</span>
-      </div>
     </div>
   </section>
 
   <!-- ===================== Controles ===================== -->
   <section class="panel controls" aria-labelledby="h-ctl">
     <div class="panel-head"><h2 id="h-ctl">Controles</h2></div>
-    <p class="hint realnote">Estás viendo el equipo real: los controles de simulación no se aplican. La lógica la decide el firmware del ESP32.</p>
 
-    <div class="simonly">
       <fieldset>
         <legend>Clima y consumo</legend>
         <div class="ctl"><label for="in-rain">Intensidad de lluvia</label><output id="o-rain" for="in-rain"></output>
@@ -329,7 +352,6 @@ button,input,select{font:inherit;color:inherit}
           <button type="button" class="btn" data-phr="6.4">Lluvia normal</button>
         </div>
       </fieldset>
-    </div>
   </section>
 
   <!-- ===================== Gráfica ===================== -->
@@ -505,61 +527,20 @@ function estadoSim() {
   const s = sim, [u1, u2] = s.us;
   const tq = u => ({ d: u.listo ? u.d : null, n: u.listo ? u.n : null, l: u.listo ? u.l : null, f: u.falla });
   return {
-    fuente: 'sim', t1: tq(u1), t2: tq(u2),
-    ph: s.phValido ? s.phVal : null, phv: s.phVolt, phok: s.phOk, phSeco: s.phSeco,
+    t1: tq(u1), t2: tq(u2),
+    ph: s.phValido ? s.phVal : null, phok: s.phOk, phSeco: s.phSeco,
     ev1: s.ev1.abierta, ev2: s.ev2.abierta, m1: s.ev1.motivo, m2: s.ev2.motivo,
     mc1: s.ev1.motivoCambio, mc2: s.ev2.motivoCambio,
-    manual: s.manual, listo: s.listo, bat: null, batp: false, batb: false,
+    manual: s.manual, listo: s.listo,
     vis1: s.l1 / CFG.cap * 100, vis2: s.l2 / CFG.cap * 100,
     flujo: s.flujo, lluvia: ctl.lluvia, saturado: ctl.saturado, rebosa: s.rebosa, entregado: s.entregado,
-    reloj: s.t, edad: 0,
+    reloj: s.t,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Dispositivo real (relay en Vercel)
+// Estado de conexión del panel
 // ---------------------------------------------------------------------------
-const real = { timer: null, ultimo: null, ultimoTs: null, primera: true };
-
-function estadoReal(d, edad) {
-  const tq = t => t || { d: null, n: null, l: null, f: false };
-  const t1 = tq(d.t1), t2 = tq(d.t2);
-  return {
-    fuente: 'real', t1, t2,
-    ph: d.ph ?? null, phv: d.phv ?? null, phok: !!d.phok, phSeco: false,
-    ev1: !!d.ev1, ev2: !!d.ev2, m1: d.m1 || '', m2: d.m2 || '',
-    manual: !!d.manual, listo: !!d.listo, bat: d.bat ?? null, batp: !!d.batp, batb: !!d.batb,
-    vis1: t1.n, vis2: t2.n, flujo: null, lluvia: null, saturado: false, rebosa: false, entregado: null,
-    reloj: d.ts / 1000, edad,
-  };
-}
-
-async function sondear() {
-  if (location.protocol === 'file:') {
-    estadoConexion('bad', 'Abre la página desde su dirección de Vercel para ver el equipo real');
-    return;
-  }
-  try {
-    const r = await fetch('/api/telemetry' + (real.primera ? '?history=1' : ''), { cache: 'no-store' });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || `El servidor respondió ${r.status}`);
-    if (fuente !== 'real') return;
-    if (real.primera && Array.isArray(j.history)) {
-      grafica.reset();
-      j.history.forEach(h => grafica.push(h.ts / 1000, h.n1, h.n2, h.ph));
-    }
-    real.primera = false;
-    if (!j.latest) { estadoConexion('warn', 'Esperando el primer dato del ESP32'); return; }
-    const e = estadoReal(j.latest, j.ageSec);
-    if (j.latest.ts !== real.ultimoTs) { real.ultimoTs = j.latest.ts; grafica.push(e.reloj, e.t1.n, e.t2.n, e.ph); }
-    real.ultimo = e;
-    pintar(e);
-  } catch (err) {
-    if (fuente !== 'real') return;
-    estadoConexion('bad', 'No se pudo leer /api/telemetry: ' + err.message);
-  }
-}
-
 function estadoConexion(tipo, txt) {
   $('st-dot').className = 'dot ' + tipo;
   $('st-txt').textContent = txt;
@@ -579,10 +560,32 @@ function pintarPanel(e) {
     else chip('c-us' + k, 'OK', 'ok');
   });
 
-  $('v-ph').textContent = e.ph == null ? '--' : fmt(e.ph, 2);
-  $('v-phv').textContent = e.phSeco ? 'Electrodo fuera del agua' : `Po = ${fmt(e.phv, 3)} V · apto ${fmt(CFG.phMin, 1)}–${fmt(CFG.phMax, 1)}`;
-  if (e.ph == null) chip('c-ph', 'Sin lectura', 'warn');
-  else chip('c-ph', e.phok ? 'Apta' : 'Fuera de rango', e.phok ? 'ok' : 'bad');
+  const ph = e.ph, palabra = $('v-phw'), marca = $('v-phmark'), say = $('v-phsay');
+  $('v-ph').textContent = ph == null ? '--' : fmt(ph, 2);
+  if (ph == null) {
+    palabra.textContent = e.phSeco ? 'sin agua' : 'sin lectura';
+    palabra.className = 'ph-word warn';
+    marca.hidden = true;
+    say.innerHTML = e.phSeco
+      ? 'El electrodo quedó <b>fuera del agua</b> porque el tanque 2 está casi vacío. Vuelve a medir cuando pase del 10 % de nivel.'
+      : 'El electrodo todavía no entrega una lectura válida.';
+  } else {
+    marca.hidden = false;
+    marca.style.left = (clamp(ph, 0, 14) / 14 * 100) + '%';
+    if (e.phok) {
+      palabra.textContent = 'apta';
+      palabra.className = 'ph-word ok';
+      say.innerHTML = 'Dentro del rango apto (<b>6,5 a 8,5</b>): el agua puede salir por EV2.';
+    } else if (ph < CFG.phMin) {
+      palabra.textContent = 'ácida';
+      palabra.className = 'ph-word bad';
+      say.innerHTML = 'Está <b>por debajo de 6,5</b>: el agua es ácida y no se entrega. EV2 sigue cerrada hasta que el carbón activado la acerque a 7,2.';
+    } else {
+      palabra.textContent = 'alcalina';
+      palabra.className = 'ph-word bad';
+      say.innerHTML = 'Está <b>por encima de 8,5</b>: el agua es alcalina y no se entrega. EV2 sigue cerrada hasta que el carbón activado la acerque a 7,2.';
+    }
+  }
 
   [[1, e.ev1, e.m1], [2, e.ev2, e.m2]].forEach(([k, abierta, m]) => {
     const s = $(`v-ev${k}s`);
@@ -591,30 +594,10 @@ function pintarPanel(e) {
     $('v-m' + k).textContent = m;
   });
 
-  $('v-bat').textContent = e.bat == null ? '--' : fmt(e.bat, 2);
-  if (!e.batp) chip('c-bat', 'No detectada', 'warn');
-  else chip('c-bat', e.batb ? 'Baja' : 'Normal', e.batb ? 'bad' : 'ok');
-
-  const vieja = e.fuente === 'real' && e.edad > 20;
-  $('sensors').classList.toggle('stale', vieja);
-  if (e.fuente === 'sim') {
-    $('fresh').textContent = 'Lectura continua';
-    estadoConexion(e.listo ? 'ok' : 'warn', `Simulación · ${e.listo ? 'control activo' : 'iniciando sensores'} · modo ${e.manual ? 'manual' : 'automático'}`);
-  } else if (e.sinDatos) {
-    $('fresh').textContent = 'Sin datos todavía';
-  } else {
-    $('fresh').textContent = `Dato de hace ${edadTxt(e.edad)}`;
-    if (vieja) estadoConexion('bad', `ESP32 desconectado · último dato hace ${edadTxt(e.edad)}`);
-    else estadoConexion('ok', `ESP32 en línea · modo ${e.manual ? 'manual' : 'automático'}${e.listo ? '' : ' · iniciando sensores'}`);
-  }
+  $('fresh').textContent = 'Lectura continua de la simulación';
+  estadoConexion(e.listo ? 'ok' : 'warn', `Simulación · ${e.listo ? 'control activo' : 'iniciando sensores'} · modo ${e.manual ? 'manual' : 'automático'}`);
 }
 
-function edadTxt(s) {
-  s = Math.max(0, Math.round(s));
-  if (s < 60) return s + ' s';
-  if (s < 3600) return Math.floor(s / 60) + ' min';
-  return Math.floor(s / 3600) + ' h';
-}
 function reloj(t) {
   t = Math.floor(t);
   const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
@@ -622,25 +605,29 @@ function reloj(t) {
 }
 
 // ---------------------------------------------------------------------------
-// Registro de eventos (detecta cambios en el estado, igual para ambas fuentes)
+// Registro de eventos (detecta cambios en el estado de la simulación)
 // ---------------------------------------------------------------------------
 let previo = null;
 function registrar(e) {
   const p = previo; previo = e;
-  if (!p || p.fuente !== e.fuente || p.sinDatos) return;
+  if (!p) return;
   if (!p.listo && e.listo) evento(e, 'Sensores listos, control activo', 'ok');
   if (p.ev1 !== e.ev1) evento(e, `EV1 ${e.ev1 ? 'abierta' : 'cerrada'} · ${e.mc1 || e.m1}`, e.ev1 ? 'ok' : '');
   if (p.ev2 !== e.ev2) evento(e, `EV2 ${e.ev2 ? 'abierta' : 'cerrada'} · ${e.mc2 || e.m2}`, e.ev2 ? 'ok' : '');
   if (p.t1.f !== e.t1.f) evento(e, e.t1.f ? 'US1 sin eco: falla del sensor del tanque 1' : 'US1 volvió a medir', e.t1.f ? 'bad' : 'ok');
   if (p.t2.f !== e.t2.f) evento(e, e.t2.f ? 'US2 sin eco: falla del sensor del tanque 2' : 'US2 volvió a medir', e.t2.f ? 'bad' : 'ok');
-  if (p.ph != null && e.ph != null && p.phok !== e.phok) evento(e, e.phok ? `pH apto (${fmt(e.ph, 2)})` : `pH fuera de rango (${fmt(e.ph, 2)})`, e.phok ? 'ok' : 'bad');
+  if (p.ph != null && e.ph != null && p.phok !== e.phok) {
+    evento(e, e.phok
+      ? `pH ${fmt(e.ph, 2)} · el agua vuelve a ser apta`
+      : `pH ${fmt(e.ph, 2)} · el agua es ${e.ph < CFG.phMin ? 'ácida' : 'alcalina'}, no se entrega`, e.phok ? 'ok' : 'bad');
+  }
   if (p.manual !== e.manual) evento(e, `Modo ${e.manual ? 'manual' : 'automático'}`, '');
   if (!p.rebosa && e.rebosa) evento(e, 'Tanque 1 lleno: el agua de lluvia rebosa', 'bad');
 }
 function evento(e, txt, tipo) {
   const li = document.createElement('li');
   const t = document.createElement('time');
-  t.textContent = e.fuente === 'sim' ? reloj(e.reloj) : new Date(e.reloj * 1000).toLocaleTimeString('es');
+  t.textContent = reloj(e.reloj);
   const s = document.createElement('span');
   s.textContent = txt; if (tipo) s.className = 'k-' + tipo;
   li.append(t, s);
@@ -1107,7 +1094,8 @@ async function crearEscena3D(stage) {
     L.ev1.set('EV1 ' + (e.ev1 ? 'abierta' : 'cerrada'), e.flujo && flujo1 ? `${fmt(e.flujo.ev1, 2)} L/s` : '');
     L.ev2.set('EV2 ' + (e.ev2 ? 'abierta' : 'cerrada'), e.flujo && flujo2 ? `${fmt(e.flujo.ev2, 2)} L/s` : '');
     L.ev1.div.classList.toggle('on', e.ev1); L.ev2.div.classList.toggle('on', e.ev2);
-    L.ph.set(e.ph == null ? 'Electrodo de pH' : `pH ${fmt(e.ph, 2)}`, e.phSeco ? 'electrodo fuera del agua' : (e.phv == null ? '' : `Po = ${fmt(e.phv, 3)} V`));
+    L.ph.set(e.ph == null ? 'Electrodo de pH' : `pH ${fmt(e.ph, 2)}`,
+      e.phSeco ? 'fuera del agua' : e.ph == null ? '' : (e.phok ? 'apta' : 'fuera de rango'));
     L.ph.div.classList.toggle('bad', e.ph != null && !e.phok);
     L.out.set('Agua apta', e.entregado == null ? '' : `${Math.round(e.entregado)} L entregados`);
   }
@@ -1174,11 +1162,10 @@ async function crearEscena3D(stage) {
 // ---------------------------------------------------------------------------
 // Ciclo principal
 // ---------------------------------------------------------------------------
-let fuente = 'sim';
 let ultimoPuntoSim = -1e9, ultimoDibujo = 0;
 
 function pintarEscena(e) {
-  $('clock').textContent = e.fuente === 'sim' ? `Tiempo simulado ${reloj(e.reloj)} · ${ctl.vel}×${ctl.pausa ? ' · en pausa' : ''}` : '';
+  $('clock').textContent = `Tiempo simulado ${reloj(e.reloj)} · ${ctl.vel}×${ctl.pausa ? ' · en pausa' : ''}`;
   if (escena) escena.actualizar(e);
 }
 
@@ -1189,46 +1176,18 @@ function pintar(e) {
 }
 
 function tick() {
-  if (fuente === 'sim') {
-    if (!ctl.pausa) {
-      const n = Math.round(ctl.vel);                // n pasos de 0,1 s simulados por cada 100 ms reales
-      for (let i = 0; i < n; i++) {
-        paso(0.1);
-        if (sim.t - ultimoPuntoSim >= 2) { ultimoPuntoSim = sim.t; const u = sim.us; grafica.push(sim.t, u[0].listo ? u[0].n : null, u[1].listo ? u[1].n : null, sim.phValido ? sim.phVal : null); }
-      }
+  if (!ctl.pausa) {
+    const n = Math.round(ctl.vel);                // n pasos de 0,1 s simulados por cada 100 ms reales
+    for (let i = 0; i < n; i++) {
+      paso(0.1);
+      if (sim.t - ultimoPuntoSim >= 2) { ultimoPuntoSim = sim.t; const u = sim.us; grafica.push(sim.t, u[0].listo ? u[0].n : null, u[1].listo ? u[1].n : null, sim.phValido ? sim.phVal : null); }
     }
-    pintar(estadoSim());
-  } else if (real.ultimo) {
-    real.ultimo.edad += 0.1;
-    pintarPanel(real.ultimo);
   }
+  pintar(estadoSim());
   const ahora = performance.now();
   if (ahora - ultimoDibujo > 250) {
     ultimoDibujo = ahora;
-    grafica.draw(fuente === 'sim' ? sim.t : Date.now() / 1000);
-  }
-}
-
-function cambiarFuente(f) {
-  if (f === fuente) return;
-  fuente = f;
-  $('src-sim').setAttribute('aria-pressed', f === 'sim');
-  $('src-real').setAttribute('aria-pressed', f === 'real');
-  $('app').classList.toggle('is-real', f === 'real');
-  $('cap').textContent = f === 'sim'
-    ? 'Arrastra para girar y usa la rueda o dos dedos para acercar. Las tuberías se ven por dentro para seguir el agua.'
-    : 'Datos enviados por el ESP32 cada 5 s. El modelo dibuja lo que miden sus sensores.';
-  limpiarRegistro();
-  grafica.reset();
-  clearInterval(real.timer);
-  if (f === 'real') {
-    real.primera = true; real.ultimo = null; real.ultimoTs = null;
-    estadoConexion('warn', 'Conectando con el servidor…');
-    pintar({ ...estadoReal({ ts: Date.now() }, 0), sinDatos: true });
-    sondear();
-    real.timer = setInterval(sondear, 3000);
-  } else {
-    ultimoPuntoSim = -1e9;
+    grafica.draw(sim.t);
   }
 }
 
@@ -1293,12 +1252,8 @@ document.querySelectorAll('[data-phr]').forEach(b => b.addEventListener('click',
   $('in-phr').value = b.dataset.phr; $('in-phr').dispatchEvent(new Event('input'));
 }));
 
-$('src-sim').addEventListener('click', () => cambiarFuente('sim'));
-$('src-real').addEventListener('click', () => cambiarFuente('real'));
-
 // Arranque: la simulación corre aunque el 3D tarde o no cargue
 sim = nuevaSim();
-if (new URLSearchParams(location.search).get('fuente') === 'real') cambiarFuente('real');
 setInterval(tick, 100);
 tick();
 
@@ -1306,7 +1261,6 @@ crearEscena3D($('stage')).then(s => {
   escena = s;
   $('stage-msg').hidden = true;
   marcas();
-  if (fuente === 'real' && real.ultimo) escena.actualizar(real.ultimo);
 }).catch(err => {
   console.error(err);
   $('stage-msg').textContent = 'No se pudo cargar el modelo 3D (revisa la conexión a internet o que el navegador tenga WebGL activo). Los sensores y la gráfica siguen funcionando.';
@@ -1314,3 +1268,4 @@ crearEscena3D($('stage')).then(s => {
 </script>
 </body>
 </html>
+
