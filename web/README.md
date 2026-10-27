@@ -35,8 +35,10 @@ Y abrir `http://127.0.0.1:8080/`. También funciona abriendo `index.html` direct
 ## Desplegar en Vercel
 
 1. Sube el repositorio a GitHub.
-2. En Vercel: **Add New → Project**, importa el repositorio y en **Root Directory** elige `web`. Framework: **Other**. No hace falta comando de build ni variables de entorno.
+2. En Vercel: **Add New → Project** e importa el repositorio. Framework: **Other**. No hace falta comando de build ni variables de entorno.
 3. Deploy.
+
+El `vercel.json` de la raíz del repositorio hace que la dirección principal (`/`) muestre `web/index.html`, así que no hace falta cambiar el **Root Directory**. Si igual lo pones en `web`, también funciona.
 
 ## Limitaciones
 
